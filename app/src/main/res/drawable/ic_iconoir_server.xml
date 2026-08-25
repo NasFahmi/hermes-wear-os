@@ -1,0 +1,25 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Iconoir: Server -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M2,4C2,2.895 2.895,2 4,2L20,2C21.105,2 22,2.895 22,4L22,8C22,9.105 21.105,10 20,10L4,10C2.895,10 2,9.105 2,8Z" />
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M2,16C2,14.895 2.895,14 4,14L20,14C21.105,14 22,14.895 22,16L22,20C22,21.105 21.105,22 20,22L4,22C2.895,22 2,21.105 2,20Z" />
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M6,6.01L6,6M6,18.01L6,18" />
+</vector>

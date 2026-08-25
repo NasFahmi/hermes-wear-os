@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Hermes Wear</string>
+    <string name="ask_hermes">Ask Hermes</string>
+    <string name="quick_actions">Quick Actions</string>
+    <string name="recent_chats">Recent Chats</string>
+    <string name="notifications">Notifications</string>
+    <string name="cron_feed">Cron Feed</string>
+    <string name="settings">Settings</string>
+    <string name="send">Send</string>
+    <string name="edit">Edit</string>
+    <string name="retry">Retry</string>
+    <string name="back">Back</string>
+    <string name="listening">Mendengarkan...</string>
+    <string name="online">Online</string>
+    <string name="offline">Offline</string>
+</resources>

@@ -1,0 +1,5 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <wearableApp package="com.hermes.wearos">
+        <rawPathResId>raw/wearable_app</rawPathResId>
+    </wearableApp>
+</resources>
