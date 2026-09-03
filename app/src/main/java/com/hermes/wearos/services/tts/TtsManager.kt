@@ -22,6 +22,7 @@ class TtsManager @Inject constructor(
 
     companion object {
         private const val TAG = "TtsManager"
+        private const val GOOGLE_TTS_ENGINE = "com.google.android.tts"
     }
 
     private var tts: TextToSpeech? = null
@@ -39,9 +40,16 @@ class TtsManager @Inject constructor(
 
     private fun initTts() {
         try {
-            tts = TextToSpeech(context.applicationContext, this)
+            // Explicitly use Google Speech Services (com.google.android.tts)
+            Log.i(TAG, "Initializing TextToSpeech with engine: $GOOGLE_TTS_ENGINE")
+            tts = TextToSpeech(context.applicationContext, this, GOOGLE_TTS_ENGINE)
         } catch (e: Exception) {
-            Log.e(TAG, "Error initializing TextToSpeech", e)
+            Log.e(TAG, "Error initializing Google TextToSpeech, falling back to default", e)
+            try {
+                tts = TextToSpeech(context.applicationContext, this)
+            } catch (e2: Exception) {
+                Log.e(TAG, "Error initializing fallback TextToSpeech", e2)
+            }
         }
     }
 
