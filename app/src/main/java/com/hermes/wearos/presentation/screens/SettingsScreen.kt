@@ -125,47 +125,31 @@ fun SettingsScreen(
             }
 
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(0.72f),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    CompactChip(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            voiceViewModel.setVoiceLanguage("id-ID")
-                        },
-                        modifier = Modifier.weight(1f),
-                        label = {
-                            Text(
-                                text = "ID",
-                                style = HermesTypography.button.copy(fontWeight = FontWeight.Bold),
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        },
-                        colors = ChipDefaults.chipColors(
-                            backgroundColor = if (voiceLang == "id-ID") HermesColors.Primary else HermesColors.SurfaceVariant
+                Chip(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        val nextLang = if (voiceLang == "id-ID") "en-US" else "id-ID"
+                        voiceViewModel.setVoiceLanguage(nextLang)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth(0.88f)
+                        .height(42.dp)
+                        .border(1.dp, HermesColors.SurfaceBorder, RoundedCornerShape(21.dp)),
+                    colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant),
+                    icon = {
+                        IconoirIcon(
+                            id = R.drawable.ic_iconoir_chat,
+                            tint = HermesColors.PrimaryLight,
+                            modifier = Modifier.size(16.dp)
                         )
-                    )
-                    CompactChip(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            voiceViewModel.setVoiceLanguage("en-US")
-                        },
-                        modifier = Modifier.weight(1f),
-                        label = {
-                            Text(
-                                text = "EN",
-                                style = HermesTypography.button.copy(fontWeight = FontWeight.Bold),
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        },
-                        colors = ChipDefaults.chipColors(
-                            backgroundColor = if (voiceLang == "en-US") HermesColors.Primary else HermesColors.SurfaceVariant
+                    },
+                    label = {
+                        Text(
+                            text = if (voiceLang == "id-ID") "Bahasa: Indonesia (ID)" else "Bahasa: English (EN)",
+                            style = HermesTypography.body.copy(fontWeight = FontWeight.Medium)
                         )
-                    )
-                }
+                    }
+                )
             }
 
             // ── Section 3: Server URL & Test Connection ───────────────

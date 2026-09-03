@@ -45,7 +45,7 @@ class AuthManager @Inject constructor(
     }
 
     val isTtsMuted: Flow<Boolean> = context.tokenDataStore.data.map { prefs ->
-        prefs[TTS_MUTED_KEY] ?: true
+        prefs[TTS_MUTED_KEY] ?: false
     }
 
     val isAuthenticated: Flow<Boolean> = token.map { !it.isNullOrBlank() }

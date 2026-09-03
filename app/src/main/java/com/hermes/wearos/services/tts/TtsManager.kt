@@ -1,9 +1,12 @@
 package com.hermes.wearos.services.tts
 
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioManager
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,7 +20,12 @@ class TtsManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) : TextToSpeech.OnInitListener {
 
+    companion object {
+        private const val TAG = "TtsManager"
+    }
+
     private var tts: TextToSpeech? = null
+    private var pendingSpeak: Pair<String, String>? = null
 
     private val _isReady = MutableStateFlow(false)
     val isReady: StateFlow<Boolean> = _isReady.asStateFlow()
@@ -26,78 +34,118 @@ class TtsManager @Inject constructor(
     val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
 
     init {
-        tts = TextToSpeech(context, this)
+        initTts()
+    }
+
+    private fun initTts() {
+        try {
+            tts = TextToSpeech(context.applicationContext, this)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initializing TextToSpeech", e)
+        }
     }
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) {
-                    _isSpeaking.value = true
+            tts?.let { engine ->
+                try {
+                    val audioAttributes = AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                    engine.setAudioAttributes(audioAttributes)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to set audio attributes", e)
                 }
 
-                override fun onDone(utteranceId: String?) {
-                    _isSpeaking.value = false
-                }
+                engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {
+                        _isSpeaking.value = true
+                    }
 
-                @Deprecated("Deprecated in Java")
-                override fun onError(utteranceId: String?) {
-                    _isSpeaking.value = false
-                }
+                    override fun onDone(utteranceId: String?) {
+                        _isSpeaking.value = false
+                    }
 
-                override fun onError(utteranceId: String?, errorCode: Int) {
-                    _isSpeaking.value = false
-                }
-            })
+                    @Deprecated("Deprecated in Java")
+                    override fun onError(utteranceId: String?) {
+                        _isSpeaking.value = false
+                    }
+
+                    override fun onError(utteranceId: String?, errorCode: Int) {
+                        _isSpeaking.value = false
+                        Log.e(TAG, "TTS Utterance error: $errorCode")
+                    }
+                })
+            }
             _isReady.value = true
+            Log.i(TAG, "TTS Engine successfully initialized")
+
+            pendingSpeak?.let { (text, lang) ->
+                pendingSpeak = null
+                speak(text, lang)
+            }
         } else {
             _isReady.value = false
+            Log.e(TAG, "TTS onInit failed: $status")
         }
     }
 
     fun speak(text: String, languageTag: String = "id-ID") {
         if (text.isBlank()) return
 
-        val engine = tts ?: return
-        if (!_isReady.value) return
+        if (!_isReady.value || tts == null) {
+            Log.d(TAG, "TTS not ready yet, queuing speech")
+            pendingSpeak = Pair(text, languageTag)
+            if (tts == null) initTts()
+            return
+        }
 
-        val locale = when (languageTag.lowercase()) {
+        val engine = tts ?: return
+
+        val targetLocale = when (languageTag.lowercase()) {
             "en-us", "en" -> Locale.US
             else -> Locale("id", "ID")
         }
 
         try {
-            val langResult = engine.setLanguage(locale)
-            if (langResult == TextToSpeech.LANG_MISSING_DATA || langResult == TextToSpeech.LANG_NOT_SUPPORTED) {
-                // Fallback to default locale if Indonesian voice data isn't installed
-                engine.language = Locale.getDefault()
+            var res = engine.setLanguage(targetLocale)
+            if (res == TextToSpeech.LANG_MISSING_DATA || res == TextToSpeech.LANG_NOT_SUPPORTED) {
+                Log.w(TAG, "Target locale $targetLocale not supported, checking default")
+                res = engine.setLanguage(Locale.getDefault())
+                if (res == TextToSpeech.LANG_MISSING_DATA || res == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    Log.w(TAG, "Default locale not supported, falling back to US English")
+                    engine.setLanguage(Locale.US)
+                }
             }
-        } catch (_: Exception) {
-            engine.language = Locale.getDefault()
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception setting TTS language", e)
+            try { engine.setLanguage(Locale.US) } catch (_: Exception) {}
         }
 
-        val params = Bundle()
-        params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "hermes_response")
+        val params = Bundle().apply {
+            putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "hermes_response")
+            putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
+            putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+        }
 
-        engine.speak(text, TextToSpeech.QUEUE_FLUSH, params, "hermes_response")
+        val result = engine.speak(text, TextToSpeech.QUEUE_FLUSH, params, "hermes_response")
+        Log.i(TAG, "TTS speak result: $result for: $text")
     }
 
     fun stop() {
+        pendingSpeak = null
         try {
             tts?.stop()
-        } catch (_: Exception) {
-            // Ignore stop errors
-        }
+        } catch (_: Exception) {}
         _isSpeaking.value = false
     }
 
     fun shutdown() {
+        stop()
         try {
-            tts?.stop()
             tts?.shutdown()
-        } catch (_: Exception) {
-            // Ignore shutdown errors
-        }
+        } catch (_: Exception) {}
         tts = null
         _isReady.value = false
         _isSpeaking.value = false

@@ -67,7 +67,7 @@ fun AssistantScreen(
     var inputMode by remember { mutableStateOf(AssistantInputMode.NONE) }
     var currentText by remember { mutableStateOf("") }
 
-    // Sync speech recognized result & partial words to currentText in real-time
+    // Sync speech recognized result & partial words in real-time
     LaunchedEffect(speechState) {
         when (speechState) {
             is SpeechRecognizerManager.SpeechState.Listening -> {
@@ -228,7 +228,7 @@ fun AssistantScreen(
     }
 }
 
-// ── 1. Idle Screen (Clean Gemini Style) ──────────────────────────────────
+// ── 1. Idle Screen (Centered, Clean Vertical Ergonomics) ──────────────────
 @Composable
 private fun AssistantIdleSection(
     onStartVoice: () -> Unit,
@@ -274,7 +274,6 @@ private fun AssistantIdleSection(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.size(76.dp)
             ) {
-                // Soft glowing background pulse
                 Box(
                     modifier = Modifier
                         .size(72.dp)
@@ -283,7 +282,6 @@ private fun AssistantIdleSection(
                         .background(HermesColors.PrimaryGlow)
                 )
 
-                // Main Touch Target (62dp)
                 Button(
                     onClick = onStartVoice,
                     modifier = Modifier
@@ -310,7 +308,7 @@ private fun AssistantIdleSection(
             Chip(
                 onClick = onStartKeyboard,
                 modifier = Modifier
-                    .fillMaxWidth(0.85f)
+                    .fillMaxWidth(0.88f)
                     .height(40.dp)
                     .border(1.dp, HermesColors.SurfaceBorder, RoundedCornerShape(20.dp)),
                 colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant),
@@ -338,6 +336,7 @@ private fun AssistantIdleSection(
         item {
             CompactChip(
                 onClick = onOpenSettings,
+                modifier = Modifier.fillMaxWidth(0.65f),
                 icon = {
                     IconoirIcon(
                         id = R.drawable.ic_iconoir_settings,
@@ -348,7 +347,9 @@ private fun AssistantIdleSection(
                 label = {
                     Text(
                         text = "Pengaturan",
-                        style = HermesTypography.caption
+                        style = HermesTypography.caption,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 },
                 colors = ChipDefaults.chipColors(backgroundColor = HermesColors.Surface)
@@ -357,7 +358,7 @@ private fun AssistantIdleSection(
     }
 }
 
-// ── 2. Voice Input Section (Real-time Live STT Preview) ───────────────────
+// ── 2. Voice Input Section (Pure Vertical, Zero Horizontal Flex) ─────────
 @Composable
 private fun VoiceInputSection(
     speechState: SpeechRecognizerManager.SpeechState,
@@ -369,7 +370,6 @@ private fun VoiceInputSection(
 ) {
     val listState = rememberScalingLazyListState()
 
-    // Determine live text: partial words while speaking or final speech result
     val liveText = when (speechState) {
         is SpeechRecognizerManager.SpeechState.Listening -> {
             speechState.partialText.ifBlank { currentText }
@@ -383,7 +383,6 @@ private fun VoiceInputSection(
     val isListening = speechState is SpeechRecognizerManager.SpeechState.Listening
     val isError = speechState is SpeechRecognizerManager.SpeechState.Error
 
-    // Subtle pulsing amber indicator dot while listening
     val infiniteTransition = rememberInfiniteTransition(label = "listening_dot")
     val dotAlpha by infiniteTransition.animateFloat(
         initialValue = 0.3f,
@@ -426,7 +425,7 @@ private fun VoiceInputSection(
         }
 
         item {
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
         }
 
         // Hasil Realtime dari STT (Plain text tanpa kotak box)
@@ -441,15 +440,15 @@ private fun VoiceInputSection(
                 color = if (liveText.isNotBlank()) HermesColors.OnBackground else HermesColors.OnSurfaceMuted,
                 modifier = Modifier
                     .fillMaxWidth(0.92f)
-                    .padding(vertical = 10.dp, horizontal = 4.dp),
+                    .padding(vertical = 8.dp, horizontal = 4.dp),
                 textAlign = TextAlign.Center
             )
         }
 
-        // Action Buttons: Tampil jika sudah ada kata terdeteksi
+        // Action Buttons (Pure Vertical Stack - No horizontal flex)
         if (liveText.isNotBlank()) {
             item {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
             }
 
             // Tombol Kirim Utama
@@ -457,7 +456,7 @@ private fun VoiceInputSection(
                 Button(
                     onClick = { onSend(liveText) },
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .fillMaxWidth(0.88f)
                         .height(40.dp),
                     shape = RoundedCornerShape(20.dp),
                     colors = ButtonDefaults.buttonColors(backgroundColor = HermesColors.Primary)
@@ -478,48 +477,81 @@ private fun VoiceInputSection(
             }
 
             item {
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
             }
 
-            // Row Opsi: Edit via Keyboard (✏️), Ulang (🔄), Batal
+            // Edit via Keyboard
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    CompactChip(
-                        onClick = { onEdit(liveText) },
-                        icon = {
-                            IconoirIcon(
-                                id = R.drawable.ic_iconoir_edit,
-                                tint = HermesColors.PrimaryLight,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        },
-                        label = { Text("Edit") },
-                        colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
-                    )
-                    CompactChip(
-                        onClick = onRetry,
-                        icon = {
-                            IconoirIcon(
-                                id = R.drawable.ic_iconoir_refresh,
-                                tint = HermesColors.Warning,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        },
-                        label = { Text("Ulang") },
-                        colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
-                    )
-                    CompactChip(
-                        onClick = onCancel,
-                        label = { Text("Batal") },
-                        colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
-                    )
-                }
+                CompactChip(
+                    onClick = { onEdit(liveText) },
+                    modifier = Modifier.fillMaxWidth(0.88f),
+                    icon = {
+                        IconoirIcon(
+                            id = R.drawable.ic_iconoir_edit,
+                            tint = HermesColors.PrimaryLight,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = "Edit via Keyboard",
+                            style = HermesTypography.caption.copy(fontWeight = FontWeight.Medium),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+                )
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            // Ulangi Suara
+            item {
+                CompactChip(
+                    onClick = onRetry,
+                    modifier = Modifier.fillMaxWidth(0.88f),
+                    icon = {
+                        IconoirIcon(
+                            id = R.drawable.ic_iconoir_refresh,
+                            tint = HermesColors.Warning,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = "Ulangi Suara",
+                            style = HermesTypography.caption.copy(fontWeight = FontWeight.Medium),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+                )
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            // Batal
+            item {
+                CompactChip(
+                    onClick = onCancel,
+                    modifier = Modifier.fillMaxWidth(0.65f),
+                    label = {
+                        Text(
+                            text = "Batal",
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+                )
             }
         } else if (isError) {
-            // Tampilan jika terjadi error audio/timeout
             item {
                 Spacer(modifier = Modifier.height(6.dp))
             }
@@ -532,41 +564,61 @@ private fun VoiceInputSection(
                 )
             }
             item {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
             }
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    CompactChip(
-                        onClick = onRetry,
-                        icon = {
-                            IconoirIcon(
-                                id = R.drawable.ic_iconoir_refresh,
-                                tint = HermesColors.Warning,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        },
-                        label = { Text("Coba Lagi") },
-                        colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
-                    )
-                    CompactChip(
-                        onClick = onCancel,
-                        label = { Text("Kembali") },
-                        colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
-                    )
-                }
+                CompactChip(
+                    onClick = onRetry,
+                    modifier = Modifier.fillMaxWidth(0.85f),
+                    icon = {
+                        IconoirIcon(
+                            id = R.drawable.ic_iconoir_refresh,
+                            tint = HermesColors.Warning,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = "Coba Lagi",
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+                )
+            }
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+            item {
+                CompactChip(
+                    onClick = onCancel,
+                    modifier = Modifier.fillMaxWidth(0.65f),
+                    label = {
+                        Text(
+                            text = "Kembali",
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+                )
             }
         } else {
-            // Jika belum ada kata terdeteksi: tampilkan tombol Batal
             item {
                 Spacer(modifier = Modifier.height(8.dp))
             }
             item {
                 CompactChip(
                     onClick = onCancel,
-                    label = { Text("Batal") },
+                    modifier = Modifier.fillMaxWidth(0.65f),
+                    label = {
+                        Text(
+                            text = "Batal",
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
                     colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
                 )
             }
@@ -574,7 +626,7 @@ private fun VoiceInputSection(
     }
 }
 
-// ── 3. Keyboard Input Section ─────────────────────────────────────────────
+// ── 3. Keyboard Input Section (Pure Vertical Stack) ───────────────────────
 @Composable
 private fun KeyboardInputSection(
     initialText: String,
@@ -658,8 +710,8 @@ private fun KeyboardInputSection(
         item {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 50.dp, max = 84.dp)
+                    .fillMaxWidth(0.92f)
+                    .heightIn(min = 50.dp, max = 80.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .background(HermesColors.Surface)
                     .border(1.dp, HermesColors.Primary, RoundedCornerShape(14.dp))
@@ -706,7 +758,7 @@ private fun KeyboardInputSection(
                 onClick = { handleSend(textFieldValue.text) },
                 enabled = textFieldValue.text.isNotBlank(),
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxWidth(0.88f)
                     .height(40.dp),
                 shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(backgroundColor = HermesColors.Primary)
@@ -727,32 +779,51 @@ private fun KeyboardInputSection(
         }
 
         item {
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
         }
 
-        // Switch to Voice & Cancel
+        // Switch to Voice
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                CompactChip(
-                    onClick = onSwitchToVoice,
-                    icon = {
-                        IconoirIcon(
-                            id = R.drawable.ic_iconoir_mic,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    },
-                    label = { Text("Suara") },
-                    colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
-                )
-                CompactChip(
-                    onClick = onCancel,
-                    label = { Text("Batal") },
-                    colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
-                )
-            }
+            CompactChip(
+                onClick = onSwitchToVoice,
+                modifier = Modifier.fillMaxWidth(0.88f),
+                icon = {
+                    IconoirIcon(
+                        id = R.drawable.ic_iconoir_mic,
+                        tint = HermesColors.PrimaryLight,
+                        modifier = Modifier.size(14.dp)
+                    )
+                },
+                label = {
+                    Text(
+                        text = "Ganti ke Suara",
+                        style = HermesTypography.caption.copy(fontWeight = FontWeight.Medium),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+            )
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        // Cancel
+        item {
+            CompactChip(
+                onClick = onCancel,
+                modifier = Modifier.fillMaxWidth(0.65f),
+                label = {
+                    Text(
+                        text = "Batal",
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+            )
         }
     }
 }
@@ -809,7 +880,7 @@ private fun AssistantLoadingSection(query: String) {
     }
 }
 
-// ── 5. Direct Answer Section (Q&A Result + TTS Mute Toggle) ──────────────
+// ── 5. Direct Answer Section (Pure Vertical Stack) ───────────────────────
 @Composable
 private fun AssistantAnswerSection(
     answerState: AssistantUiState.Answer,
@@ -842,7 +913,7 @@ private fun AssistantAnswerSection(
             Card(
                 onClick = {},
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxWidth(0.92f)
                     .border(1.dp, HermesColors.Primary.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
                 backgroundPainter = CardDefaults.cardBackgroundPainter(
                     startBackgroundColor = HermesColors.Primary.copy(alpha = 0.15f),
@@ -863,12 +934,12 @@ private fun AssistantAnswerSection(
             Spacer(modifier = Modifier.height(6.dp))
         }
 
-        // Full AI Answer Text Card with Obsidian Surface
+        // Full AI Answer Text Card
         item {
             Card(
                 onClick = {},
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxWidth(0.92f)
                     .border(1.dp, HermesColors.SurfaceBorder, RoundedCornerShape(14.dp)),
                 backgroundPainter = CardDefaults.cardBackgroundPainter(
                     startBackgroundColor = HermesColors.Surface,
@@ -888,7 +959,7 @@ private fun AssistantAnswerSection(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        // TTS Mute / Unmute Control with Speaking Pulse
+        // TTS Mute / Unmute Control
         item {
             val isMuted = answerState.isMuted
             val isSpeaking = answerState.isSpeaking
@@ -896,7 +967,7 @@ private fun AssistantAnswerSection(
             Chip(
                 onClick = onToggleMute,
                 modifier = Modifier
-                    .fillMaxWidth(0.9f)
+                    .fillMaxWidth(0.88f)
                     .height(42.dp)
                     .border(
                         1.dp,
@@ -930,58 +1001,84 @@ private fun AssistantAnswerSection(
         }
 
         item {
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-
-        // Ask Again Actions: Mic and Keyboard
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                CompactChip(
-                    onClick = onAskAgainVoice,
-                    icon = {
-                        IconoirIcon(
-                            id = R.drawable.ic_iconoir_mic,
-                            tint = HermesColors.OnPrimary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    },
-                    label = { Text("Tanya Lagi") },
-                    colors = ChipDefaults.chipColors(backgroundColor = HermesColors.Primary)
-                )
-                CompactChip(
-                    onClick = onAskAgainKeyboard,
-                    icon = {
-                        IconoirIcon(
-                            id = R.drawable.ic_iconoir_keyboard,
-                            tint = HermesColors.PrimaryLight,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    },
-                    label = { Text("Ketik") },
-                    colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
-                )
-            }
-        }
-
-        item {
             Spacer(modifier = Modifier.height(6.dp))
+        }
+
+        // Tanya Lagi (Voice)
+        item {
+            Chip(
+                onClick = onAskAgainVoice,
+                modifier = Modifier
+                    .fillMaxWidth(0.88f)
+                    .height(40.dp),
+                colors = ChipDefaults.chipColors(backgroundColor = HermesColors.Primary),
+                icon = {
+                    IconoirIcon(
+                        id = R.drawable.ic_iconoir_mic,
+                        tint = HermesColors.OnPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                label = {
+                    Text(
+                        text = "Tanya Lagi",
+                        style = HermesTypography.button
+                    )
+                }
+            )
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        // Tanya via Keyboard
+        item {
+            CompactChip(
+                onClick = onAskAgainKeyboard,
+                modifier = Modifier.fillMaxWidth(0.88f),
+                icon = {
+                    IconoirIcon(
+                        id = R.drawable.ic_iconoir_keyboard,
+                        tint = HermesColors.PrimaryLight,
+                        modifier = Modifier.size(14.dp)
+                    )
+                },
+                label = {
+                    Text(
+                        text = "Ketik Pertanyaan",
+                        style = HermesTypography.caption.copy(fontWeight = FontWeight.Medium),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+            )
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(4.dp))
         }
 
         // Close / Home button
         item {
             CompactChip(
                 onClick = onClose,
-                label = { Text("Selesai") },
+                modifier = Modifier.fillMaxWidth(0.65f),
+                label = {
+                    Text(
+                        text = "Selesai",
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
                 colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
             )
         }
     }
 }
 
-// ── 6. Assistant Error Section ────────────────────────────────────────────
+// ── 6. Assistant Error Section (Pure Vertical Stack) ──────────────────────
 @Composable
 private fun AssistantErrorSection(
     query: String,
@@ -1020,28 +1117,38 @@ private fun AssistantErrorSection(
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(10.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                CompactChip(
-                    onClick = onRetry,
-                    icon = {
-                        IconoirIcon(
-                            id = R.drawable.ic_iconoir_refresh,
-                            tint = HermesColors.OnPrimary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    },
-                    label = { Text("Coba Lagi") },
-                    colors = ChipDefaults.chipColors(backgroundColor = HermesColors.Primary)
-                )
-                CompactChip(
-                    onClick = onDismiss,
-                    label = { Text("Batal") },
-                    colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
-                )
-            }
+            CompactChip(
+                onClick = onRetry,
+                modifier = Modifier.fillMaxWidth(0.85f),
+                icon = {
+                    IconoirIcon(
+                        id = R.drawable.ic_iconoir_refresh,
+                        tint = HermesColors.OnPrimary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                },
+                label = {
+                    Text(
+                        text = "Coba Lagi",
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                colors = ChipDefaults.chipColors(backgroundColor = HermesColors.Primary)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            CompactChip(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(0.65f),
+                label = {
+                    Text(
+                        text = "Batal",
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+            )
         }
     }
 }
