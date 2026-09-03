@@ -48,9 +48,8 @@ class MainViewModel @Inject constructor(
         QuickAction(id = "agenda", label = "Agenda", icon = "📋", command = "Agenda hari ini")
     )
 
-    init {
-        refreshAll()
-    }
+    // Network requests are only called on explicit user action (e.g. Test Connection)
+    // to keep Wear OS startup instantaneous and responsive.
 
     fun getQuickActions(): List<QuickAction> = quickActions
 

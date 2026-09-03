@@ -25,6 +25,7 @@ class AuthManager @Inject constructor(
         private val DEVICE_ID_KEY = stringPreferencesKey("device_id")
         private val SERVER_URL_KEY = stringPreferencesKey("server_url")
         private val VOICE_LANGUAGE_KEY = stringPreferencesKey("voice_language")
+        private val TTS_MUTED_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("tts_muted")
     }
 
     val token: Flow<String?> = context.tokenDataStore.data.map { prefs ->
@@ -43,6 +44,10 @@ class AuthManager @Inject constructor(
         prefs[VOICE_LANGUAGE_KEY] ?: "id-ID"
     }
 
+    val isTtsMuted: Flow<Boolean> = context.tokenDataStore.data.map { prefs ->
+        prefs[TTS_MUTED_KEY] ?: true
+    }
+
     val isAuthenticated: Flow<Boolean> = token.map { !it.isNullOrBlank() }
 
     suspend fun getToken(): String? = token.first()
@@ -50,6 +55,14 @@ class AuthManager @Inject constructor(
     suspend fun getServerUrl(): String = serverUrl.first()
 
     suspend fun getVoiceLanguage(): String = voiceLanguage.first()
+
+    suspend fun getIsTtsMuted(): Boolean = isTtsMuted.first()
+
+    suspend fun saveTtsMuted(muted: Boolean) {
+        context.tokenDataStore.edit { prefs ->
+            prefs[TTS_MUTED_KEY] = muted
+        }
+    }
 
     suspend fun saveToken(newToken: String) {
         context.tokenDataStore.edit { prefs ->

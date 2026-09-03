@@ -1,0 +1,25 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Iconoir: Sound High / Speaker On -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M2,14L2,10C2,9.448 2.448,9 3,9L6.586,9C6.851,9 7.106,8.895 7.293,8.707L11.293,4.707C11.923,4.077 13,4.523 13,5.414L13,18.586C13,19.477 11.923,19.923 11.293,19.293L7.293,15.293C7.106,15.105 6.851,15 6.586,15L3,15C2.448,15 2,14.552 2,14Z" />
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M16.5,8.5C17.438,9.438 18,10.72 18,12C18,13.28 17.438,14.562 16.5,15.5" />
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M19.5,5.5C21.219,7.219 22,9.609 22,12C22,14.391 21.219,16.781 19.5,18.5" />
+</vector>

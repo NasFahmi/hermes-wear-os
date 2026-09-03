@@ -2,66 +2,75 @@ package com.hermes.wearos.presentation.theme
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
+// Taste-Skill Typography Tokens (Glanceable, High-Rhythm Wear OS Scale)
 object HermesTypography {
 
-    // Title — 14sp (from PRD)
+    // Main App & Section Titles
     val title: TextStyle
         @Composable
         get() = TextStyle(
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.3.sp,
             color = HermesColors.OnBackground
         )
 
-    // Body — 12sp (from PRD)
+    // Body text for AI Answer & Prompts (Optimized for readability on circular displays)
     val body: TextStyle
         @Composable
         get() = TextStyle(
-            fontSize = 12.sp,
+            fontSize = 12.5.sp,
             fontWeight = FontWeight.Normal,
+            lineHeight = 17.5.sp,
+            letterSpacing = 0.15.sp,
             color = HermesColors.OnSurface
         )
 
-    // Caption — 10sp (from PRD)
+    // Captions & Subtitles
     val caption: TextStyle
         @Composable
         get() = TextStyle(
-            fontSize = 10.sp,
+            fontSize = 10.5.sp,
             fontWeight = FontWeight.Normal,
+            letterSpacing = 0.2.sp,
             color = HermesColors.OnSurfaceVariant
         )
 
-    // Button
+    // Button Labels
     val button: TextStyle
         @Composable
         get() = TextStyle(
             fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.3.sp,
             color = HermesColors.OnPrimary
         )
 
-    // Status value (e.g., CPU 21%)
+    // Status Numbers & Metrics
     val statusValue: TextStyle
         @Composable
         get() = TextStyle(
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
+            letterSpacing = 0.5.sp,
             color = HermesColors.OnSurface
         )
 
-    // Status label (e.g., "CPU", "RAM")
+    // Status Labels
     val statusLabel: TextStyle
         @Composable
         get() = TextStyle(
             fontSize = 10.sp,
-            fontWeight = FontWeight.Normal,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 0.4.sp,
             color = HermesColors.OnSurfaceVariant
         )
 
-    // Notification title
+    // Notification / Card Title
     val notificationTitle: TextStyle
         @Composable
         get() = TextStyle(
@@ -70,7 +79,7 @@ object HermesTypography {
             color = HermesColors.OnBackground
         )
 
-    // Notification body
+    // Notification / Card Body
     val notificationBody: TextStyle
         @Composable
         get() = TextStyle(
