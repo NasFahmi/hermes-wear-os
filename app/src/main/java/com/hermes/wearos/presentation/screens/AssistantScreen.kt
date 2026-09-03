@@ -1,12 +1,9 @@
 package com.hermes.wearos.presentation.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,7 +17,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -71,11 +67,20 @@ fun AssistantScreen(
     var inputMode by remember { mutableStateOf(AssistantInputMode.NONE) }
     var currentText by remember { mutableStateOf("") }
 
-    // Sync speech recognized result to pending text
+    // Sync speech recognized result & partial words to currentText in real-time
     LaunchedEffect(speechState) {
-        if (speechState is SpeechRecognizerManager.SpeechState.Result) {
-            currentText = (speechState as SpeechRecognizerManager.SpeechState.Result).text
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        when (speechState) {
+            is SpeechRecognizerManager.SpeechState.Listening -> {
+                val partial = (speechState as SpeechRecognizerManager.SpeechState.Listening).partialText
+                if (partial.isNotBlank()) {
+                    currentText = partial
+                }
+            }
+            is SpeechRecognizerManager.SpeechState.Result -> {
+                currentText = (speechState as SpeechRecognizerManager.SpeechState.Result).text
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            }
+            else -> {}
         }
     }
 
@@ -90,17 +95,16 @@ fun AssistantScreen(
         ) {
             Crossfade(
                 targetState = Pair(inputMode, assistantState),
-                animationSpec = tween(220),
+                animationSpec = tween(200),
                 label = "screen_crossfade"
             ) { (mode, state) ->
                 when {
-                    // ── 1. Voice Input & Review Mode (STT) ─────────────────────
+                    // ── 1. Voice Input & Real-time STT Preview ─────────────────
                     mode == AssistantInputMode.VOICE -> {
                         VoiceInputSection(
                             speechState = speechState,
-                            recognizedText = currentText,
-                            onSend = {
-                                val textToSend = currentText.trim()
+                            currentText = currentText,
+                            onSend = { textToSend ->
                                 if (textToSend.isNotBlank()) {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     inputMode = AssistantInputMode.NONE
@@ -109,8 +113,9 @@ fun AssistantScreen(
                                     currentText = ""
                                 }
                             },
-                            onEdit = {
+                            onEdit = { textToEdit ->
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                currentText = textToEdit
                                 voiceViewModel.stopListening()
                                 voiceViewModel.resetState()
                                 inputMode = AssistantInputMode.KEYBOARD
@@ -223,7 +228,7 @@ fun AssistantScreen(
     }
 }
 
-// ── Idle Screen (Gemini Aura & Tactile Ergonomics) ────────────────────────
+// ── 1. Idle Screen (Clean Gemini Style) ──────────────────────────────────
 @Composable
 private fun AssistantIdleSection(
     onStartVoice: () -> Unit,
@@ -232,13 +237,12 @@ private fun AssistantIdleSection(
 ) {
     val listState = rememberScalingLazyListState()
 
-    // Breathing pulse animation for mic aura
     val infiniteTransition = rememberInfiniteTransition(label = "idle_aura")
     val auraScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.08f,
+        targetValue = 1.09f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1600, easing = FastOutSlowInEasing),
+            animation = tween(1500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "aura_scale"
@@ -247,77 +251,68 @@ private fun AssistantIdleSection(
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
         state = listState,
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 24.dp),
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // App Title & Tagline
+        // App Title
         item {
             Text(
                 text = "Hermes",
-                style = HermesTypography.title.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold),
+                style = HermesTypography.title.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold),
                 color = Color.White,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = "Tanya apa saja",
-                style = HermesTypography.caption,
-                color = HermesColors.OnSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(12.dp))
         }
 
-        // Central Mic Button with Gemini Glowing Aura
+        item {
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        // Central Mic Button with Breathing Aura
         item {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.size(80.dp)
+                modifier = Modifier.size(76.dp)
             ) {
-                // Soft glow background
+                // Soft glowing background pulse
                 Box(
                     modifier = Modifier
-                        .size(76.dp)
+                        .size(72.dp)
                         .scale(auraScale)
                         .clip(CircleShape)
                         .background(HermesColors.PrimaryGlow)
                 )
 
-                // Main Touch Target (68dp >= 48dp Android requirement)
+                // Main Touch Target (62dp)
                 Button(
                     onClick = onStartVoice,
                     modifier = Modifier
-                        .size(68.dp)
+                        .size(62.dp)
                         .clip(CircleShape)
-                        .border(1.5.dp, HermesColors.PrimaryLight.copy(alpha = 0.5f), CircleShape),
-                    colors = ButtonDefaults.buttonColors(
-                        backgroundColor = HermesColors.Primary
-                    )
+                        .border(1.5.dp, HermesColors.PrimaryLight.copy(alpha = 0.6f), CircleShape),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = HermesColors.Primary)
                 ) {
                     IconoirIcon(
                         id = R.drawable.ic_iconoir_mic,
                         tint = HermesColors.OnPrimary,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "Ketuk untuk Bicara",
-                style = HermesTypography.caption.copy(fontWeight = FontWeight.SemiBold),
-                color = HermesColors.PrimaryLight
-            )
-            Spacer(modifier = Modifier.height(12.dp))
         }
 
-        // Secondary Action: Keyboard Input
+        item {
+            Spacer(modifier = Modifier.height(6.dp))
+        }
+
+        // Secondary Action: Keyboard Input Chip
         item {
             Chip(
                 onClick = onStartKeyboard,
                 modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .height(44.dp)
-                    .border(1.dp, HermesColors.SurfaceBorder, RoundedCornerShape(22.dp)),
+                    .fillMaxWidth(0.85f)
+                    .height(40.dp)
+                    .border(1.dp, HermesColors.SurfaceBorder, RoundedCornerShape(20.dp)),
                 colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant),
                 icon = {
                     IconoirIcon(
@@ -333,10 +328,13 @@ private fun AssistantIdleSection(
                     )
                 }
             )
+        }
+
+        item {
             Spacer(modifier = Modifier.height(6.dp))
         }
 
-        // Quick Settings Access
+        // Settings Access
         item {
             CompactChip(
                 onClick = onOpenSettings,
@@ -344,7 +342,7 @@ private fun AssistantIdleSection(
                     IconoirIcon(
                         id = R.drawable.ic_iconoir_settings,
                         tint = HermesColors.OnSurfaceVariant,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(13.dp)
                     )
                 },
                 label = {
@@ -359,113 +357,160 @@ private fun AssistantIdleSection(
     }
 }
 
-// ── Voice Input & STT Review Section ──────────────────────────────────────
+// ── 2. Voice Input Section (Real-time Live STT Preview) ───────────────────
 @Composable
 private fun VoiceInputSection(
     speechState: SpeechRecognizerManager.SpeechState,
-    recognizedText: String,
-    onSend: () -> Unit,
-    onEdit: () -> Unit,
+    currentText: String,
+    onSend: (String) -> Unit,
+    onEdit: (String) -> Unit,
     onRetry: () -> Unit,
     onCancel: () -> Unit
 ) {
     val listState = rememberScalingLazyListState()
 
-    // Dynamic wave pulse during speech listening
-    val infiniteTransition = rememberInfiniteTransition(label = "listening_pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.22f,
+    // Determine live text: partial words while speaking or final speech result
+    val liveText = when (speechState) {
+        is SpeechRecognizerManager.SpeechState.Listening -> {
+            speechState.partialText.ifBlank { currentText }
+        }
+        is SpeechRecognizerManager.SpeechState.Result -> {
+            speechState.text.ifBlank { currentText }
+        }
+        else -> currentText
+    }
+
+    val isListening = speechState is SpeechRecognizerManager.SpeechState.Listening
+    val isError = speechState is SpeechRecognizerManager.SpeechState.Error
+
+    // Subtle pulsing amber indicator dot while listening
+    val infiniteTransition = rememberInfiniteTransition(label = "listening_dot")
+    val dotAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1.0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
+            animation = tween(600, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "pulse_scale"
-    )
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 0.65f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glow_alpha"
+        label = "dot_alpha"
     )
 
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
         state = listState,
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 20.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        when (speechState) {
-            is SpeechRecognizerManager.SpeechState.Listening -> {
-                item {
-                    Text(
-                        text = "Mendengarkan...",
-                        style = HermesTypography.title.copy(fontSize = 14.sp),
-                        color = HermesColors.PrimaryLight
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                }
-
-                // Breathing Waveform Orb
-                item {
+        // Kata kecil "Mendengarkan..." di atas
+        item {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                if (isListening) {
                     Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(68.dp)
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(HermesColors.Primary.copy(alpha = dotAlpha))
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                }
+                Text(
+                    text = if (isError) "Gagal mendeteksi" else "Mendengarkan...",
+                    style = HermesTypography.caption.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium),
+                    color = if (isError) HermesColors.Error else HermesColors.PrimaryLight,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(6.dp))
+        }
+
+        // Hasil Realtime dari STT (Plain text tanpa kotak box)
+        item {
+            Text(
+                text = if (liveText.isNotBlank()) liveText else "Bicara sekarang...",
+                style = HermesTypography.body.copy(
+                    fontSize = 14.sp,
+                    lineHeight = 19.sp,
+                    fontWeight = if (liveText.isNotBlank()) FontWeight.SemiBold else FontWeight.Normal
+                ),
+                color = if (liveText.isNotBlank()) HermesColors.OnBackground else HermesColors.OnSurfaceMuted,
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .padding(vertical = 10.dp, horizontal = 4.dp),
+                textAlign = TextAlign.Center
+            )
+        }
+
+        // Action Buttons: Tampil jika sudah ada kata terdeteksi
+        if (liveText.isNotBlank()) {
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // Tombol Kirim Utama
+            item {
+                Button(
+                    onClick = { onSend(liveText) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = HermesColors.Primary)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .scale(pulseScale)
-                                .clip(CircleShape)
-                                .background(HermesColors.Primary.copy(alpha = glowAlpha))
+                        IconoirIcon(
+                            id = R.drawable.ic_iconoir_send,
+                            tint = HermesColors.OnPrimary,
+                            modifier = Modifier.size(16.dp)
                         )
-                        Box(
-                            modifier = Modifier
-                                .size(50.dp)
-                                .clip(CircleShape)
-                                .background(HermesColors.Primary)
-                                .border(1.5.dp, Color.White.copy(alpha = 0.6f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "Kirim", style = HermesTypography.button)
+                    }
+                }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
+            // Row Opsi: Edit via Keyboard (✏️), Ulang (🔄), Batal
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    CompactChip(
+                        onClick = { onEdit(liveText) },
+                        icon = {
                             IconoirIcon(
-                                id = R.drawable.ic_iconoir_mic,
-                                tint = HermesColors.OnPrimary,
-                                modifier = Modifier.size(24.dp)
+                                id = R.drawable.ic_iconoir_edit,
+                                tint = HermesColors.PrimaryLight,
+                                modifier = Modifier.size(14.dp)
                             )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                }
-
-                // Real-time live transcript preview
-                if (speechState.partialText.isNotBlank()) {
-                    item {
-                        Card(
-                            onClick = {},
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .border(1.dp, HermesColors.SurfaceBorder, RoundedCornerShape(12.dp)),
-                            backgroundPainter = CardDefaults.cardBackgroundPainter(
-                                startBackgroundColor = HermesColors.Surface,
-                                endBackgroundColor = HermesColors.Surface
+                        },
+                        label = { Text("Edit") },
+                        colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+                    )
+                    CompactChip(
+                        onClick = onRetry,
+                        icon = {
+                            IconoirIcon(
+                                id = R.drawable.ic_iconoir_refresh,
+                                tint = HermesColors.Warning,
+                                modifier = Modifier.size(14.dp)
                             )
-                        ) {
-                            Text(
-                                text = "\"${speechState.partialText}\"",
-                                style = HermesTypography.body,
-                                color = HermesColors.PrimaryLight,
-                                modifier = Modifier.padding(8.dp),
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                }
-
-                item {
+                        },
+                        label = { Text("Ulang") },
+                        colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+                    )
                     CompactChip(
                         onClick = onCancel,
                         label = { Text("Batal") },
@@ -473,174 +518,63 @@ private fun VoiceInputSection(
                     )
                 }
             }
-
-            is SpeechRecognizerManager.SpeechState.Result -> {
-                item {
-                    Text(
-                        text = "Tinjau Pertanyaan:",
-                        style = HermesTypography.caption,
-                        color = HermesColors.OnSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
-
-                // Recognized Text Card
-                item {
-                    Card(
-                        onClick = {},
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, HermesColors.Primary.copy(alpha = 0.4f), RoundedCornerShape(14.dp)),
-                        backgroundPainter = CardDefaults.cardBackgroundPainter(
-                            startBackgroundColor = HermesColors.Surface,
-                            endBackgroundColor = HermesColors.Surface
-                        )
-                    ) {
-                        Text(
-                            text = "\"$recognizedText\"",
-                            style = HermesTypography.body.copy(fontWeight = FontWeight.Medium),
-                            color = HermesColors.OnBackground,
-                            modifier = Modifier.padding(10.dp),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                // Main Send Button (Gold Accent, Height 44dp)
-                item {
-                    Button(
-                        onClick = onSend,
-                        enabled = recognizedText.isNotBlank(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp),
-                        shape = RoundedCornerShape(22.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            backgroundColor = HermesColors.Primary
-                        )
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            IconoirIcon(
-                                id = R.drawable.ic_iconoir_send,
-                                tint = HermesColors.OnPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Kirim",
-                                style = HermesTypography.button
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                }
-
-                // Edit (✏️), Retry (🔄), Cancel
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        CompactChip(
-                            onClick = onEdit,
-                            icon = {
-                                IconoirIcon(
-                                    id = R.drawable.ic_iconoir_edit,
-                                    tint = HermesColors.PrimaryLight,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            },
-                            label = { Text("Edit") },
-                            colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
-                        )
-                        CompactChip(
-                            onClick = onRetry,
-                            icon = {
-                                IconoirIcon(
-                                    id = R.drawable.ic_iconoir_refresh,
-                                    tint = HermesColors.Warning,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            },
-                            label = { Text("Ulang") },
-                            colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
-                        )
-                        CompactChip(
-                            onClick = onCancel,
-                            label = { Text("Batal") },
-                            colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
-                        )
-                    }
-                }
+        } else if (isError) {
+            // Tampilan jika terjadi error audio/timeout
+            item {
+                Spacer(modifier = Modifier.height(6.dp))
             }
-
-            is SpeechRecognizerManager.SpeechState.Error -> {
-                item {
-                    IconoirIcon(
-                        id = R.drawable.ic_iconoir_warning,
-                        tint = HermesColors.Error,
-                        modifier = Modifier.size(26.dp)
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = speechState.message,
-                        style = HermesTypography.caption,
-                        color = HermesColors.Error,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                }
-
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        CompactChip(
-                            onClick = onRetry,
-                            icon = {
-                                IconoirIcon(
-                                    id = R.drawable.ic_iconoir_refresh,
-                                    tint = HermesColors.Warning,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            },
-                            label = { Text("Coba Lagi") },
-                            colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
-                        )
-                        CompactChip(
-                            onClick = onCancel,
-                            label = { Text("Kembali") },
-                            colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
-                        )
-                    }
-                }
+            item {
+                Text(
+                    text = (speechState as SpeechRecognizerManager.SpeechState.Error).message,
+                    style = HermesTypography.caption,
+                    color = HermesColors.Error,
+                    textAlign = TextAlign.Center
+                )
             }
-
-            is SpeechRecognizerManager.SpeechState.Idle -> {
-                item {
-                    Text(
-                        text = "Siap mendengarkan.",
-                        style = HermesTypography.caption,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
                     CompactChip(
                         onClick = onRetry,
-                        label = { Text("Mulai Bicara") },
-                        colors = ChipDefaults.chipColors(backgroundColor = HermesColors.Primary)
+                        icon = {
+                            IconoirIcon(
+                                id = R.drawable.ic_iconoir_refresh,
+                                tint = HermesColors.Warning,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        },
+                        label = { Text("Coba Lagi") },
+                        colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+                    )
+                    CompactChip(
+                        onClick = onCancel,
+                        label = { Text("Kembali") },
+                        colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
                     )
                 }
+            }
+        } else {
+            // Jika belum ada kata terdeteksi: tampilkan tombol Batal
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            item {
+                CompactChip(
+                    onClick = onCancel,
+                    label = { Text("Batal") },
+                    colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+                )
             }
         }
     }
 }
 
-// ── Keyboard Input Section ────────────────────────────────────────────────
+// ── 3. Keyboard Input Section ─────────────────────────────────────────────
 @Composable
 private fun KeyboardInputSection(
     initialText: String,
@@ -714,6 +648,9 @@ private fun KeyboardInputSection(
                     color = HermesColors.Primary
                 )
             }
+        }
+
+        item {
             Spacer(modifier = Modifier.height(6.dp))
         }
 
@@ -722,7 +659,7 @@ private fun KeyboardInputSection(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 52.dp, max = 88.dp)
+                    .heightIn(min = 50.dp, max = 84.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .background(HermesColors.Surface)
                     .border(1.dp, HermesColors.Primary, RoundedCornerShape(14.dp))
@@ -757,7 +694,10 @@ private fun KeyboardInputSection(
                     )
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(6.dp))
         }
 
         // Send Button
@@ -767,8 +707,8 @@ private fun KeyboardInputSection(
                 enabled = textFieldValue.text.isNotBlank(),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(42.dp),
-                shape = RoundedCornerShape(21.dp),
+                    .height(40.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(backgroundColor = HermesColors.Primary)
             ) {
                 Row(
@@ -784,6 +724,9 @@ private fun KeyboardInputSection(
                     Text(text = "Kirim", style = HermesTypography.button)
                 }
             }
+        }
+
+        item {
             Spacer(modifier = Modifier.height(6.dp))
         }
 
@@ -814,7 +757,7 @@ private fun KeyboardInputSection(
     }
 }
 
-// ── Assistant Loading Section ─────────────────────────────────────────────
+// ── 4. Assistant Loading Section ──────────────────────────────────────────
 @Composable
 private fun AssistantLoadingSection(query: String) {
     val infiniteTransition = rememberInfiniteTransition(label = "loading_rotation")
@@ -842,11 +785,9 @@ private fun AssistantLoadingSection(query: String) {
                 indicatorColor = HermesColors.Primary,
                 trackColor = HermesColors.SurfaceVariant,
                 strokeWidth = 3.dp,
-                modifier = Modifier
-                    .size(42.dp)
-                    .scale(1f)
+                modifier = Modifier.size(40.dp)
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = "Hermes berpikir...",
                 style = HermesTypography.caption.copy(
@@ -868,7 +809,7 @@ private fun AssistantLoadingSection(query: String) {
     }
 }
 
-// ── Direct Answer Section (Q&A Result + TTS Mute Toggle) ─────────────────
+// ── 5. Direct Answer Section (Q&A Result + TTS Mute Toggle) ──────────────
 @Composable
 private fun AssistantAnswerSection(
     answerState: AssistantUiState.Answer,
@@ -879,7 +820,6 @@ private fun AssistantAnswerSection(
 ) {
     val listState = rememberScalingLazyListState()
 
-    // Speaking pulse animation for audio indicator
     val infiniteTransition = rememberInfiniteTransition(label = "speaking_pulse")
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.4f,
@@ -917,6 +857,9 @@ private fun AssistantAnswerSection(
                     textAlign = TextAlign.Center
                 )
             }
+        }
+
+        item {
             Spacer(modifier = Modifier.height(6.dp))
         }
 
@@ -939,6 +882,9 @@ private fun AssistantAnswerSection(
                     modifier = Modifier.padding(10.dp)
                 )
             }
+        }
+
+        item {
             Spacer(modifier = Modifier.height(8.dp))
         }
 
@@ -981,7 +927,10 @@ private fun AssistantAnswerSection(
                     )
                 }
             )
-            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
         // Ask Again Actions: Mic and Keyboard
@@ -1015,6 +964,9 @@ private fun AssistantAnswerSection(
                     colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
                 )
             }
+        }
+
+        item {
             Spacer(modifier = Modifier.height(6.dp))
         }
 
@@ -1025,12 +977,11 @@ private fun AssistantAnswerSection(
                 label = { Text("Selesai") },
                 colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
             )
-            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
 
-// ── Assistant Error Section ───────────────────────────────────────────────
+// ── 6. Assistant Error Section ────────────────────────────────────────────
 @Composable
 private fun AssistantErrorSection(
     query: String,

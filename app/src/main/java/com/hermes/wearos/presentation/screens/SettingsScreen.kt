@@ -48,7 +48,8 @@ fun SettingsScreen(
         ScalingLazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = listState,
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 22.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Header
@@ -60,17 +61,16 @@ fun SettingsScreen(
                     IconoirIcon(
                         id = R.drawable.ic_iconoir_settings,
                         tint = HermesColors.Primary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Pengaturan",
-                        style = HermesTypography.title.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold),
+                        style = HermesTypography.title.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
                         color = Color.White,
                         textAlign = TextAlign.Center
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
             }
 
             // ── Section 1: Default Audio / TTS Mute Toggle ─────────────
@@ -80,7 +80,6 @@ fun SettingsScreen(
                     style = HermesTypography.caption,
                     color = HermesColors.OnSurfaceVariant
                 )
-                Spacer(modifier = Modifier.height(4.dp))
             }
 
             item {
@@ -91,11 +90,11 @@ fun SettingsScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp)
+                        .height(42.dp)
                         .border(
                             1.dp,
                             if (!isTtsMuted) HermesColors.Primary.copy(alpha = 0.5f) else HermesColors.SurfaceBorder,
-                            RoundedCornerShape(22.dp)
+                            RoundedCornerShape(21.dp)
                         ),
                     colors = ChipDefaults.chipColors(
                         backgroundColor = if (isTtsMuted) HermesColors.SurfaceVariant else HermesColors.SurfaceElevated
@@ -114,7 +113,6 @@ fun SettingsScreen(
                         )
                     }
                 )
-                Spacer(modifier = Modifier.height(10.dp))
             }
 
             // ── Section 2: Voice Language (STT) ───────────────────────
@@ -124,20 +122,27 @@ fun SettingsScreen(
                     style = HermesTypography.caption,
                     color = HermesColors.OnSurfaceVariant
                 )
-                Spacer(modifier = Modifier.height(4.dp))
             }
 
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                    modifier = Modifier.fillMaxWidth(0.72f),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     CompactChip(
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             voiceViewModel.setVoiceLanguage("id-ID")
                         },
-                        label = { Text("ID (Indonesia)") },
+                        modifier = Modifier.weight(1f),
+                        label = {
+                            Text(
+                                text = "ID",
+                                style = HermesTypography.button.copy(fontWeight = FontWeight.Bold),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        },
                         colors = ChipDefaults.chipColors(
                             backgroundColor = if (voiceLang == "id-ID") HermesColors.Primary else HermesColors.SurfaceVariant
                         )
@@ -147,13 +152,20 @@ fun SettingsScreen(
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             voiceViewModel.setVoiceLanguage("en-US")
                         },
-                        label = { Text("EN (English)") },
+                        modifier = Modifier.weight(1f),
+                        label = {
+                            Text(
+                                text = "EN",
+                                style = HermesTypography.button.copy(fontWeight = FontWeight.Bold),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        },
                         colors = ChipDefaults.chipColors(
                             backgroundColor = if (voiceLang == "en-US") HermesColors.Primary else HermesColors.SurfaceVariant
                         )
                     )
                 }
-                Spacer(modifier = Modifier.height(10.dp))
             }
 
             // ── Section 3: Server URL & Test Connection ───────────────
@@ -163,7 +175,6 @@ fun SettingsScreen(
                     style = HermesTypography.caption,
                     color = HermesColors.OnSurfaceVariant
                 )
-                Spacer(modifier = Modifier.height(3.dp))
             }
 
             item {
@@ -185,7 +196,6 @@ fun SettingsScreen(
                         modifier = Modifier.padding(4.dp)
                     )
                 }
-                Spacer(modifier = Modifier.height(6.dp))
             }
 
             // Test Connection Button
@@ -201,8 +211,8 @@ fun SettingsScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(42.dp)
-                        .border(1.dp, HermesColors.SurfaceBorder, RoundedCornerShape(21.dp)),
+                        .height(40.dp)
+                        .border(1.dp, HermesColors.SurfaceBorder, RoundedCornerShape(20.dp)),
                     colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant),
                     icon = {
                         IconoirIcon(
@@ -222,7 +232,6 @@ fun SettingsScreen(
 
             if (testStatus != null) {
                 item {
-                    Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
@@ -243,8 +252,6 @@ fun SettingsScreen(
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(12.dp)) }
-
             // Back Button
             item {
                 CompactChip(
@@ -262,8 +269,6 @@ fun SettingsScreen(
                     colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
                 )
             }
-
-            item { Spacer(modifier = Modifier.height(16.dp)) }
         }
     }
 }
