@@ -26,6 +26,7 @@ class AuthManager @Inject constructor(
         private val SERVER_URL_KEY = stringPreferencesKey("server_url")
         private val VOICE_LANGUAGE_KEY = stringPreferencesKey("voice_language")
         private val TTS_MUTED_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("tts_muted")
+        private val FCM_TOKEN_KEY = stringPreferencesKey("fcm_token")
     }
 
     val token: Flow<String?> = context.tokenDataStore.data.map { prefs ->
@@ -34,6 +35,10 @@ class AuthManager @Inject constructor(
 
     val deviceId: Flow<String?> = context.tokenDataStore.data.map { prefs ->
         prefs[DEVICE_ID_KEY]
+    }
+
+    val fcmToken: Flow<String?> = context.tokenDataStore.data.map { prefs ->
+        prefs[FCM_TOKEN_KEY]
     }
 
     val serverUrl: Flow<String> = context.tokenDataStore.data.map { prefs ->
@@ -58,9 +63,31 @@ class AuthManager @Inject constructor(
 
     suspend fun getIsTtsMuted(): Boolean = isTtsMuted.first()
 
+    suspend fun getFcmToken(): String? = fcmToken.first()
+
+    suspend fun getDeviceId(): String {
+        val current = deviceId.first()
+        if (!current.isNullOrBlank()) return current
+        val newId = "wearos-" + java.util.UUID.randomUUID().toString().take(8)
+        saveDeviceId(newId)
+        return newId
+    }
+
+    fun getDeviceModel(): String {
+        val model = android.os.Build.MODEL ?: "Wear OS Device"
+        val manufacturer = android.os.Build.MANUFACTURER ?: ""
+        return if (model.startsWith(manufacturer, ignoreCase = true)) model else "$manufacturer $model"
+    }
+
     suspend fun saveTtsMuted(muted: Boolean) {
         context.tokenDataStore.edit { prefs ->
             prefs[TTS_MUTED_KEY] = muted
+        }
+    }
+
+    suspend fun saveFcmToken(token: String) {
+        context.tokenDataStore.edit { prefs ->
+            prefs[FCM_TOKEN_KEY] = token.trim()
         }
     }
 

@@ -9,6 +9,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
+import android.content.Intent
+import com.google.firebase.messaging.FirebaseMessaging
 import com.hermes.wearos.presentation.navigation.WearNavHost
 import com.hermes.wearos.presentation.theme.HermesWearTheme
 import com.hermes.wearos.presentation.viewmodel.ChatViewModel
@@ -33,6 +35,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         requestRequiredPermissions()
+        initFcm()
+        handleFcmNotificationIntent(intent)
 
         setContent {
             HermesWearTheme {
@@ -42,6 +46,37 @@ class MainActivity : ComponentActivity() {
                     voiceViewModel = voiceViewModel
                 )
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleFcmNotificationIntent(intent)
+    }
+
+    private fun initFcm() {
+        try {
+            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val token = task.result
+                    if (!token.isNullOrBlank()) {
+                        mainViewModel.registerFcmToken(token)
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            // Graceful fallback if Google Play Services / Firebase is not initialized
+        }
+    }
+
+    private fun handleFcmNotificationIntent(intent: Intent?) {
+        val fcmTitle = intent?.getStringExtra("fcm_title")
+        val fcmBody = intent?.getStringExtra("fcm_body")
+        if (!fcmBody.isNullOrBlank()) {
+            chatViewModel.showNotificationAnswer(
+                title = fcmTitle ?: "Hermes Notification",
+                body = fcmBody
+            )
         }
     }
 

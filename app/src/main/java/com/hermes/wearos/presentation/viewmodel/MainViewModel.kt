@@ -94,6 +94,21 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun registerFcmToken(token: String) {
+        viewModelScope.launch {
+            authManager.saveFcmToken(token)
+            chatRepository.registerDevice(token)
+        }
+    }
+
+    fun testLocalNotification() {
+        notificationManager.showFcmNotification(
+            title = "Hermes Updates",
+            body = "Tes notifikasi berhasil! Smartwatch bergetar & notifikasi aktif.",
+            messageId = System.currentTimeMillis().toString()
+        )
+    }
+
     fun addNotification(notification: NotificationPayload) {
         val current = _notifications.value.toMutableList()
         current.add(0, notification)

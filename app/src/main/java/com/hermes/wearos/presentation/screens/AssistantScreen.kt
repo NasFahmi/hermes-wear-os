@@ -66,21 +66,137 @@ fun AssistantScreen(
 
     var inputMode by remember { mutableStateOf(AssistantInputMode.NONE) }
     var currentText by remember { mutableStateOf("") }
+    var directLiveText by remember { mutableStateOf("") }
+    var directAutoRetryCount by remember { mutableIntStateOf(0) }
+
+    // Auto-listen for wake phrases (Hello Hermes, etc.) when on Idle screen
+    LaunchedEffect(assistantState, inputMode, speechState) {
+        if (assistantState is AssistantUiState.Idle && inputMode == AssistantInputMode.NONE) {
+            when (speechState) {
+                is SpeechRecognizerManager.SpeechState.Idle -> {
+                    delay(300)
+                    voiceViewModel.startListening()
+                }
+                is SpeechRecognizerManager.SpeechState.Error -> {
+                    // Back off briefly before restarting idle wake listener to avoid CPU/mic churning
+                    delay(1500)
+                    if (assistantState is AssistantUiState.Idle && inputMode == AssistantInputMode.NONE) {
+                        voiceViewModel.startListening()
+                    }
+                }
+                else -> {}
+            }
+        }
+    }
+
+    // Direct Mode lifecycle: cleanly start listening when entering DirectListening
+    LaunchedEffect(assistantState) {
+        if (assistantState is AssistantUiState.DirectListening) {
+            directAutoRetryCount = 0
+            directLiveText = ""
+            voiceViewModel.stopListening()
+            voiceViewModel.resetState()
+            delay(150)
+            voiceViewModel.startListening()
+        }
+    }
+
+    // Direct Mode Debounce: Auto-send after 2.2 seconds of silence
+    LaunchedEffect(directLiveText, assistantState) {
+        if (assistantState is AssistantUiState.DirectListening && directLiveText.isNotBlank()) {
+            delay(2200)
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            val queryToSend = directLiveText
+            directLiveText = ""
+            voiceViewModel.stopListening()
+            voiceViewModel.resetState()
+            chatViewModel.askDirectQuestion(queryToSend)
+        }
+    }
 
     // Sync speech recognized result & partial words in real-time
-    LaunchedEffect(speechState) {
-        when (speechState) {
-            is SpeechRecognizerManager.SpeechState.Listening -> {
-                val partial = (speechState as SpeechRecognizerManager.SpeechState.Listening).partialText
-                if (partial.isNotBlank()) {
-                    currentText = partial
+    LaunchedEffect(speechState, assistantState, inputMode) {
+        val currentSpeech = speechState
+        when {
+            // Wake word detection on Idle
+            assistantState is AssistantUiState.Idle && inputMode == AssistantInputMode.NONE -> {
+                val recognized = when (currentSpeech) {
+                    is SpeechRecognizerManager.SpeechState.Listening -> currentSpeech.partialText
+                    is SpeechRecognizerManager.SpeechState.Result -> currentSpeech.text
+                    else -> ""
+                }
+                if (recognized.isNotBlank()) {
+                    val (isWake, remaining) = voiceViewModel.checkWakeWord(recognized)
+                    if (isWake) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        voiceViewModel.stopListening()
+                        voiceViewModel.resetState()
+                        if (remaining.isNotBlank()) {
+                            chatViewModel.askDirectQuestion(remaining)
+                        } else {
+                            directLiveText = ""
+                            chatViewModel.startDirectListening()
+                        }
+                    }
                 }
             }
-            is SpeechRecognizerManager.SpeechState.Result -> {
-                currentText = (speechState as SpeechRecognizerManager.SpeechState.Result).text
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+
+            // Direct Mode STT Sync
+            assistantState is AssistantUiState.DirectListening -> {
+                when (currentSpeech) {
+                    is SpeechRecognizerManager.SpeechState.Listening -> {
+                        val partial = currentSpeech.partialText
+                        if (partial.isNotBlank()) {
+                            directLiveText = partial
+                        }
+                    }
+                    is SpeechRecognizerManager.SpeechState.Result -> {
+                        val text = currentSpeech.text
+                        if (text.isNotBlank()) {
+                            directLiveText = text
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            voiceViewModel.stopListening()
+                            voiceViewModel.resetState()
+                            chatViewModel.askDirectQuestion(text)
+                            directLiveText = ""
+                        }
+                    }
+                    is SpeechRecognizerManager.SpeechState.Error -> {
+                        // If error occurred (silence timeout) but text was already partially captured, send it!
+                        if (directLiveText.isNotBlank()) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            val queryToSend = directLiveText
+                            directLiveText = ""
+                            voiceViewModel.stopListening()
+                            voiceViewModel.resetState()
+                            chatViewModel.askDirectQuestion(queryToSend)
+                        } else if (currentSpeech.errorCode == 11 && directAutoRetryCount < 1) {
+                            // Automatically rebind if system speech service was disconnected
+                            directAutoRetryCount++
+                            delay(300)
+                            voiceViewModel.startListening()
+                        }
+                    }
+                    else -> {}
+                }
             }
-            else -> {}
+
+            // Standard Voice Input Mode
+            inputMode == AssistantInputMode.VOICE -> {
+                when (currentSpeech) {
+                    is SpeechRecognizerManager.SpeechState.Listening -> {
+                        val partial = currentSpeech.partialText
+                        if (partial.isNotBlank()) {
+                            currentText = partial
+                        }
+                    }
+                    is SpeechRecognizerManager.SpeechState.Result -> {
+                        currentText = currentSpeech.text
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
+                    else -> {}
+                }
+            }
         }
     }
 
@@ -168,6 +284,14 @@ fun AssistantScreen(
                                 AssistantLoadingSection(query = state.query)
                             }
 
+                            is AssistantUiState.Streaming -> {
+                                AssistantStreamingSection(
+                                    query = state.query,
+                                    currentText = state.currentText,
+                                    onCancel = { chatViewModel.resetToIdle() }
+                                )
+                            }
+
                             is AssistantUiState.Answer -> {
                                 AssistantAnswerSection(
                                     answerState = state,
@@ -204,6 +328,55 @@ fun AssistantScreen(
                                 )
                             }
 
+                            // ── Direct Mode States (Minimalist, Ephemeral, Large Plain Text) ──
+                            is AssistantUiState.DirectListening -> {
+                                DirectListeningSection(
+                                    liveText = directLiveText,
+                                    speechState = speechState,
+                                    onRetry = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        directLiveText = ""
+                                        voiceViewModel.stopListening()
+                                        voiceViewModel.resetState()
+                                        voiceViewModel.startListening()
+                                    },
+                                    onCancel = {
+                                        voiceViewModel.stopListening()
+                                        voiceViewModel.resetState()
+                                        directLiveText = ""
+                                        chatViewModel.resetToIdle()
+                                    }
+                                )
+                            }
+
+                            is AssistantUiState.DirectStreaming -> {
+                                DirectStreamingSection(
+                                    query = state.query,
+                                    currentText = state.currentText,
+                                    onCancel = { chatViewModel.resetToIdle() }
+                                )
+                            }
+
+                            is AssistantUiState.DirectAnswer -> {
+                                DirectAnswerSection(
+                                    query = state.query,
+                                    response = state.response,
+                                    isMuted = state.isMuted,
+                                    onToggleMute = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        chatViewModel.toggleMute()
+                                    },
+                                    onAskAgain = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        voiceViewModel.stopListening()
+                                        voiceViewModel.resetState()
+                                        directLiveText = ""
+                                        chatViewModel.startDirectListening()
+                                    },
+                                    onClose = { chatViewModel.resetToIdle() }
+                                )
+                            }
+
                             is AssistantUiState.Idle -> {
                                 AssistantIdleSection(
                                     onStartVoice = {
@@ -211,6 +384,13 @@ fun AssistantScreen(
                                         currentText = ""
                                         inputMode = AssistantInputMode.VOICE
                                         voiceViewModel.startListening()
+                                    },
+                                    onStartDirect = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        voiceViewModel.stopListening()
+                                        voiceViewModel.resetState()
+                                        directLiveText = ""
+                                        chatViewModel.startDirectListening()
                                     },
                                     onStartKeyboard = {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -232,6 +412,7 @@ fun AssistantScreen(
 @Composable
 private fun AssistantIdleSection(
     onStartVoice: () -> Unit,
+    onStartDirect: () -> Unit,
     onStartKeyboard: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
@@ -297,6 +478,35 @@ private fun AssistantIdleSection(
                     )
                 }
             }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(6.dp))
+        }
+
+        // Action: Mode Direct (Hands-Free Speech AI)
+        item {
+            Chip(
+                onClick = onStartDirect,
+                modifier = Modifier
+                    .fillMaxWidth(0.88f)
+                    .height(40.dp)
+                    .border(1.dp, HermesColors.Primary.copy(alpha = 0.7f), RoundedCornerShape(20.dp)),
+                colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceElevated),
+                icon = {
+                    IconoirIcon(
+                        id = R.drawable.ic_iconoir_sound_high,
+                        tint = HermesColors.Primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                label = {
+                    Text(
+                        text = "Mode Direct",
+                        style = HermesTypography.body.copy(fontWeight = FontWeight.SemiBold, color = HermesColors.PrimaryLight)
+                    )
+                }
+            )
         }
 
         item {
@@ -880,6 +1090,126 @@ private fun AssistantLoadingSection(query: String) {
     }
 }
 
+// ── 4b. Assistant Streaming Section (Real-time Typewriter SSE) ────────────
+@Composable
+private fun AssistantStreamingSection(
+    query: String,
+    currentText: String,
+    onCancel: () -> Unit
+) {
+    val listState = rememberScalingLazyListState()
+
+    val infiniteTransition = rememberInfiniteTransition(label = "cursor_blink")
+    val cursorAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(500, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "cursor_alpha"
+    )
+
+    LaunchedEffect(currentText.length) {
+        if (currentText.isNotBlank()) {
+            listState.animateScrollToItem(index = 2)
+        }
+    }
+
+    ScalingLazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        state = listState,
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        item {
+            Card(
+                onClick = {},
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .border(1.dp, HermesColors.Primary.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
+                backgroundPainter = CardDefaults.cardBackgroundPainter(
+                    startBackgroundColor = HermesColors.Primary.copy(alpha = 0.12f),
+                    endBackgroundColor = HermesColors.Primary.copy(alpha = 0.12f)
+                )
+            ) {
+                Text(
+                    text = query,
+                    style = HermesTypography.caption.copy(fontWeight = FontWeight.Medium),
+                    color = HermesColors.PrimaryLight,
+                    modifier = Modifier.padding(6.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(6.dp))
+        }
+
+        item {
+            Card(
+                onClick = {},
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .border(1.dp, HermesColors.Primary.copy(alpha = 0.4f), RoundedCornerShape(14.dp)),
+                backgroundPainter = CardDefaults.cardBackgroundPainter(
+                    startBackgroundColor = HermesColors.Surface,
+                    endBackgroundColor = HermesColors.Surface
+                )
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(HermesColors.Primary.copy(alpha = cursorAlpha))
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = "Mengetik...",
+                            style = HermesTypography.caption.copy(
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = HermesColors.PrimaryLight
+                            )
+                        )
+                    }
+
+                    Text(
+                        text = if (currentText.isNotBlank()) currentText else "...",
+                        style = HermesTypography.body.copy(fontSize = 13.sp, lineHeight = 18.sp),
+                        color = HermesColors.OnSurface
+                    )
+                }
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(6.dp))
+        }
+
+        item {
+            CompactChip(
+                onClick = onCancel,
+                modifier = Modifier.fillMaxWidth(0.65f),
+                label = {
+                    Text(
+                        text = "Batal",
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+            )
+        }
+    }
+}
+
 // ── 5. Direct Answer Section (Pure Vertical Stack) ───────────────────────
 @Composable
 private fun AssistantAnswerSection(
@@ -1143,6 +1473,369 @@ private fun AssistantErrorSection(
                 label = {
                     Text(
                         text = "Batal",
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+            )
+        }
+    }
+}
+
+// ── 5. Direct Mode Sections (Minimalist STT, Plain Large Text, Zero History) ─
+
+@Composable
+private fun DirectListeningSection(
+    liveText: String,
+    speechState: SpeechRecognizerManager.SpeechState,
+    onRetry: () -> Unit,
+    onCancel: () -> Unit
+) {
+    val listState = rememberScalingLazyListState()
+    val isError = speechState is SpeechRecognizerManager.SpeechState.Error && liveText.isBlank()
+    val infiniteTransition = rememberInfiniteTransition(label = "direct_pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.18f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(750, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse_scale"
+    )
+
+    ScalingLazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        state = listState,
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (isError) {
+            val errorMsg = (speechState as SpeechRecognizerManager.SpeechState.Error).message
+            item {
+                IconoirIcon(
+                    id = R.drawable.ic_iconoir_sound_off,
+                    tint = HermesColors.Warning,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            item {
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+            item {
+                Text(
+                    text = errorMsg,
+                    style = HermesTypography.caption.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium),
+                    color = HermesColors.Error,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(0.92f)
+                )
+            }
+            item {
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+            item {
+                Button(
+                    onClick = onRetry,
+                    modifier = Modifier
+                        .size(50.dp)
+                        .clip(CircleShape)
+                        .border(1.5.dp, HermesColors.PrimaryLight, CircleShape),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = HermesColors.Primary)
+                ) {
+                    IconoirIcon(
+                        id = R.drawable.ic_iconoir_mic,
+                        tint = HermesColors.OnPrimary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+            item {
+                Text(
+                    text = "Coba Lagi",
+                    style = HermesTypography.caption.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium),
+                    color = HermesColors.PrimaryLight
+                )
+            }
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            item {
+                CompactChip(
+                    onClick = onCancel,
+                    modifier = Modifier.fillMaxWidth(0.55f),
+                    label = {
+                        Text(
+                            text = "Batal",
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+                )
+            }
+        } else {
+            // Minimalist Status Tag
+            item {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(9.dp)
+                            .scale(pulseScale)
+                            .clip(CircleShape)
+                            .background(HermesColors.Primary)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (liveText.isNotBlank()) "Mendengar..." else "Mendengarkan...",
+                        style = HermesTypography.caption.copy(
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = HermesColors.PrimaryLight
+                        )
+                    )
+                }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
+            // Live recognized speech in clean typography (no container card)
+            item {
+                Text(
+                    text = if (liveText.isNotBlank()) liveText else "Bicara sekarang...",
+                    style = HermesTypography.title.copy(
+                        fontSize = if (liveText.isNotBlank()) 17.sp else 14.sp,
+                        lineHeight = 23.sp,
+                        fontWeight = if (liveText.isNotBlank()) FontWeight.SemiBold else FontWeight.Normal
+                    ),
+                    color = if (liveText.isNotBlank()) HermesColors.OnBackground else HermesColors.OnSurfaceMuted,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth(0.94f)
+                        .padding(horizontal = 4.dp)
+                )
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            item {
+                CompactChip(
+                    onClick = onCancel,
+                    modifier = Modifier.fillMaxWidth(0.55f),
+                    label = {
+                        Text(
+                            text = "Batal",
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DirectStreamingSection(
+    query: String,
+    currentText: String,
+    onCancel: () -> Unit
+) {
+    val listState = rememberScalingLazyListState()
+
+    LaunchedEffect(currentText.length) {
+        if (currentText.isNotBlank()) {
+            listState.animateScrollToItem(index = 2)
+        }
+    }
+
+    ScalingLazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        state = listState,
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Query text preview
+        item {
+            Text(
+                text = "\"$query\"",
+                style = HermesTypography.caption.copy(
+                    fontSize = 11.sp,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                ),
+                color = HermesColors.OnSurfaceMuted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(0.92f)
+            )
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Plain large text streaming directly without container cards
+        item {
+            Text(
+                text = if (currentText.isNotBlank()) currentText else "Mengetik...",
+                style = HermesTypography.body.copy(
+                    fontSize = 16.sp,
+                    lineHeight = 23.sp,
+                    fontWeight = FontWeight.Normal
+                ),
+                color = HermesColors.OnBackground,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth(0.94f)
+            )
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(14.dp))
+        }
+
+        item {
+            CompactChip(
+                onClick = onCancel,
+                modifier = Modifier.fillMaxWidth(0.55f),
+                label = {
+                    Text(
+                        text = "Batal",
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+            )
+        }
+    }
+}
+
+@Composable
+private fun DirectAnswerSection(
+    query: String,
+    response: String,
+    isMuted: Boolean,
+    onToggleMute: () -> Unit,
+    onAskAgain: () -> Unit,
+    onClose: () -> Unit
+) {
+    val listState = rememberScalingLazyListState()
+
+    ScalingLazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        state = listState,
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Header with query and sound toggle
+        item {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(0.94f)
+            ) {
+                Text(
+                    text = query,
+                    style = HermesTypography.caption.copy(
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = HermesColors.PrimaryLight
+                    ),
+                    modifier = Modifier.weight(1f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                CompactChip(
+                    onClick = onToggleMute,
+                    icon = {
+                        IconoirIcon(
+                            id = if (isMuted) R.drawable.ic_iconoir_sound_off else R.drawable.ic_iconoir_sound_high,
+                            tint = if (isMuted) HermesColors.OnSurfaceVariant else HermesColors.Primary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    },
+                    colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant)
+                )
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Clean plain large text (No container/card, easily scrollable)
+        item {
+            Text(
+                text = response,
+                style = HermesTypography.body.copy(
+                    fontSize = 16.sp,
+                    lineHeight = 23.sp,
+                    fontWeight = FontWeight.Normal
+                ),
+                color = HermesColors.OnBackground,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth(0.94f)
+            )
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // Direct Mic Button below response: Clears previous answer immediately, no history saved
+        item {
+            Button(
+                onClick = onAskAgain,
+                modifier = Modifier
+                    .size(54.dp)
+                    .clip(CircleShape)
+                    .border(1.5.dp, HermesColors.PrimaryLight, CircleShape),
+                colors = ButtonDefaults.buttonColors(backgroundColor = HermesColors.Primary)
+            ) {
+                IconoirIcon(
+                    id = R.drawable.ic_iconoir_mic,
+                    tint = HermesColors.OnPrimary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        item {
+            Text(
+                text = "Tanya Lagi",
+                style = HermesTypography.caption.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium),
+                color = HermesColors.PrimaryLight
+            )
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Close / Return to Home
+        item {
+            CompactChip(
+                onClick = onClose,
+                modifier = Modifier.fillMaxWidth(0.55f),
+                label = {
+                    Text(
+                        text = "Selesai",
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )

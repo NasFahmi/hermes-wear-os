@@ -236,6 +236,34 @@ fun SettingsScreen(
                 }
             }
 
+            // Test Notification Button
+            item {
+                Chip(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        mainViewModel.testLocalNotification()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp)
+                        .border(1.dp, HermesColors.SurfaceBorder, RoundedCornerShape(20.dp)),
+                    colors = ChipDefaults.chipColors(backgroundColor = HermesColors.SurfaceVariant),
+                    icon = {
+                        IconoirIcon(
+                            id = R.drawable.ic_hermes_notification,
+                            tint = HermesColors.Primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = "Tes Notifikasi Jam",
+                            style = HermesTypography.caption.copy(fontWeight = FontWeight.Medium)
+                        )
+                    }
+                )
+            }
+
             // Back Button
             item {
                 CompactChip(

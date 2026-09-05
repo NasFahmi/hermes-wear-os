@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "71356696622",
+    "project_id": "hermes-app-211ab",
+    "storage_bucket": "hermes-app-211ab.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:71356696622:android:f11a400c62967267e677bf",
+        "android_client_info": {
+          "package_name": "com.hermes.wearos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDREBLjAUbbK45t08-efyH_WSGi9Il5uPY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

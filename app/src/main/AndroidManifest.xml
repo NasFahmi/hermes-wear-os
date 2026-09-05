@@ -13,6 +13,13 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Package visibility for Speech Recognition on Android 11+ (API 30+) -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
     <!-- Standalone wear app (no companion) -->
     <application
         android:name=".HermesWearApplication"
@@ -55,6 +62,24 @@
         <service
             android:name=".services.notification.NotificationActionService"
             android:exported="false" />
+
+        <!-- Firebase Cloud Messaging Service -->
+        <service
+            android:name=".services.notification.MyFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Test Notification Receiver (can be triggered via ADB) -->
+        <receiver
+            android:name=".services.notification.TestNotificationReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.hermes.wearos.TEST_NOTIFICATION" />
+            </intent-filter>
+        </receiver>
 
         <!-- Wearable listener service for phone communication -->
         <service

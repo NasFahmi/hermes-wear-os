@@ -22,6 +22,7 @@ class WearNotificationManager @Inject constructor(
         const val CHANNEL_CRITICAL = "hermes_critical"
         const val CHANNEL_IMPORTANT = "hermes_important"
         const val CHANNEL_INFO = "hermes_info"
+        const val CHANNEL_HERMES_UPDATES = "hermes_updates"
 
         const val GROUP_MESSAGES = "hermes_messages"
     }
@@ -35,6 +36,15 @@ class WearNotificationManager @Inject constructor(
 
     private fun createChannels() {
         val channels = listOf(
+            NotificationChannel(
+                CHANNEL_HERMES_UPDATES,
+                "Hermes Updates",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Pembaruan chat dan laporan Hermes"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 250, 150, 250)
+            },
             NotificationChannel(
                 CHANNEL_CRITICAL,
                 "Hermes - Critical",
@@ -62,6 +72,46 @@ class WearNotificationManager @Inject constructor(
         )
 
         notificationManager.createNotificationChannels(channels)
+    }
+
+    fun showFcmNotification(
+        title: String,
+        body: String,
+        messageId: String = System.currentTimeMillis().toString(),
+        data: Map<String, String> = emptyMap()
+    ) {
+        val notificationId = (messageId + System.currentTimeMillis()).hashCode()
+        android.util.Log.d("WearNotification", "showFcmNotification called: id=$notificationId, title=$title, body=$body")
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("fcm_title", title)
+            putExtra("fcm_body", body)
+            data.forEach { (k, v) -> putExtra(k, v) }
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            notificationId,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_HERMES_UPDATES)
+            .setSmallIcon(R.drawable.ic_hermes_notification)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setVibrate(longArrayOf(0, 250, 150, 250))
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify(notificationId, notification)
+        android.util.Log.d("WearNotification", "notificationManager.notify executed successfully for id=$notificationId")
     }
 
     fun showNotification(

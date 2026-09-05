@@ -17,11 +17,25 @@ class VoiceViewModel @Inject constructor(
     private val authManager: AuthManager
 ) : ViewModel() {
 
+    companion object {
+        private val WAKE_WORD_REGEX = Regex(
+            """^(?:(?:halo|hello|hallo|hei|hey|yo|oy|oi)\s+)?hermes\b[\s,.:;!?-]*(.*)$""",
+            RegexOption.IGNORE_CASE
+        )
+    }
+
     val speechState: StateFlow<SpeechRecognizerManager.SpeechState> =
         speechRecognizerManager.state
 
     val voiceLanguage: StateFlow<String> = authManager.voiceLanguage
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "id-ID")
+
+    fun checkWakeWord(input: String): Pair<Boolean, String> {
+        val trimmed = input.trim()
+        val match = WAKE_WORD_REGEX.find(trimmed) ?: return Pair(false, "")
+        val remainingQuery = match.groupValues.getOrNull(1)?.trim() ?: ""
+        return Pair(true, remainingQuery)
+    }
 
     fun startListening() {
         val currentLang = voiceLanguage.value

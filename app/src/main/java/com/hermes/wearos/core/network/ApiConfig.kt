@@ -10,6 +10,7 @@ object ApiConfig {
     const val MAX_RESPONSE_WORDS = 50
 
     const val ENDPOINT_CHAT = "api/wear/chat"
+    const val ENDPOINT_CHAT_STREAM = "api/wear/chat/stream"
     const val ENDPOINT_REGISTER = "api/wear/register"
     const val ENDPOINT_NOTIFICATIONS = "api/wear/notifications"
     const val ENDPOINT_CRON = "api/wear/cron"

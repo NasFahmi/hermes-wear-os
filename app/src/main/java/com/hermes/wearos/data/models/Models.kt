@@ -18,8 +18,28 @@ data class ChatResponse(
 data class DeviceRegistration(
     val deviceId: String,
     val deviceModel: String,
-    val platform: String = "wearos"
+    val platform: String = "wearos",
+    val fcmToken: String? = null
 )
+
+@Serializable
+data class StreamEventPayload(
+    val type: String? = null,
+    val taskId: String? = null,
+    val status: String? = null,
+    val token: String? = null,
+    val content: String? = null,
+    val fullResponse: String? = null,
+    val response: String? = null,
+    val error: String? = null
+)
+
+sealed interface StreamChatEvent {
+    data class Start(val taskId: String) : StreamChatEvent
+    data class Token(val token: String) : StreamChatEvent
+    data class Done(val fullResponse: String) : StreamChatEvent
+    data class Error(val message: String) : StreamChatEvent
+}
 
 @Serializable
 data class NotificationPayload(
