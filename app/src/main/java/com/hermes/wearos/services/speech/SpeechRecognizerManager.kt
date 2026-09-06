@@ -8,6 +8,7 @@ import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,83 +32,92 @@ class SpeechRecognizerManager @Inject constructor(
     private val mainHandler = Handler(Looper.getMainLooper())
     private var speechRecognizer: SpeechRecognizer? = null
 
+    val isOnDeviceSupported: Boolean
+        get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+
     private fun getOrCreateRecognizer(): SpeechRecognizer {
         speechRecognizer?.let { return it }
 
-        val recognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
-            setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {
-                    android.util.Log.d("SpeechRecognizer", "onReadyForSpeech")
-                    _state.value = SpeechState.Listening()
-                }
-
-                override fun onBeginningOfSpeech() {
-                    android.util.Log.d("SpeechRecognizer", "onBeginningOfSpeech")
-                    _state.value = SpeechState.Listening()
-                }
-
-                override fun onRmsChanged(rmsdB: Float) {}
-
-                override fun onBufferReceived(buffer: ByteArray?) {}
-
-                override fun onEndOfSpeech() {
-                    android.util.Log.d("SpeechRecognizer", "onEndOfSpeech")
-                }
-
-                override fun onError(error: Int) {
-                    val errorMessage = when (error) {
-                        SpeechRecognizer.ERROR_NO_MATCH -> "Suara tidak terdeteksi. Coba lagi."
-                        SpeechRecognizer.ERROR_NETWORK -> "Koneksi internet bermasalah."
-                        SpeechRecognizer.ERROR_AUDIO -> "Error audio/mikrofon."
-                        SpeechRecognizer.ERROR_SERVER -> "Error server speech."
-                        SpeechRecognizer.ERROR_CLIENT -> "Koneksi speech terputus."
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Waktu bicara habis."
-                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Mikrofon sibuk, coba lagi."
-                        10 -> "Terlalu banyak permintaan."
-                        11 -> "Koneksi server terputus. Silakan coba lagi."
-                        12 -> "Bahasa tidak didukung."
-                        13 -> "Bahasa belum tersedia."
-                        else -> "Error speech ($error)"
-                    }
-                    android.util.Log.e("SpeechRecognizer", "onError: code=$error, msg=$errorMessage")
-                    
-                    // Always clean up disconnected/corrupted recognizer so next listen binds fresh
-                    if (error == SpeechRecognizer.ERROR_CLIENT || 
-                        error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY || 
-                        error == 11 /* ERROR_SERVER_DISCONNECTED */ ||
-                        error == SpeechRecognizer.ERROR_SERVER ||
-                        error == SpeechRecognizer.ERROR_NETWORK) {
-                        destroyRecognizerInternal()
-                    }
-                    
-                    _state.value = SpeechState.Error(errorMessage, errorCode = error)
-                }
-
-                // Final complete speech results when user finishes speaking
-                override fun onResults(results: Bundle?) {
-                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    val resultText = matches?.getOrNull(0)
-                    android.util.Log.d("SpeechRecognizer", "onResults: matches=$resultText")
-                    if (!resultText.isNullOrBlank()) {
-                        _state.value = SpeechState.Result(resultText)
-                    } else {
-                        _state.value = SpeechState.Error("Tidak ada suara terdeteksi.")
-                    }
-                }
-
-                // Real-time interim preview
-                override fun onPartialResults(partialResults: Bundle?) {
-                    val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    val text = matches?.getOrNull(0) ?: ""
-                    android.util.Log.d("SpeechRecognizer", "onPartialResults: $text")
-                    if (text.isNotBlank()) {
-                        _state.value = SpeechState.Listening(partialText = text)
-                    }
-                }
-
-                override fun onEvent(eventType: Int, params: Bundle?) {}
-            })
+        val recognizer = try {
+            if (isOnDeviceSupported) {
+                android.util.Log.i("SpeechRecognizer", "Using On-Device Hardware Speech Recognition")
+                SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+            } else {
+                android.util.Log.i("SpeechRecognizer", "Using Standard System Speech Recognition")
+                SpeechRecognizer.createSpeechRecognizer(context)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("SpeechRecognizer", "Fallback to default recognizer: ${e.message}")
+            SpeechRecognizer.createSpeechRecognizer(context)
         }
+
+        recognizer.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {
+                android.util.Log.d("SpeechRecognizer", "onReadyForSpeech")
+                _state.value = SpeechState.Listening()
+            }
+
+            override fun onBeginningOfSpeech() {
+                android.util.Log.d("SpeechRecognizer", "onBeginningOfSpeech")
+                _state.value = SpeechState.Listening()
+            }
+
+            override fun onRmsChanged(rmsdB: Float) {}
+
+            override fun onBufferReceived(buffer: ByteArray?) {}
+
+            override fun onEndOfSpeech() {
+                android.util.Log.d("SpeechRecognizer", "onEndOfSpeech")
+            }
+
+            override fun onError(error: Int) {
+                val errorMessage = when (error) {
+                    SpeechRecognizer.ERROR_NO_MATCH -> "Suara tidak terdeteksi. Coba lagi."
+                    SpeechRecognizer.ERROR_NETWORK -> "Koneksi internet bermasalah."
+                    SpeechRecognizer.ERROR_AUDIO -> "Error audio/mikrofon."
+                    SpeechRecognizer.ERROR_SERVER -> "Error server speech."
+                    SpeechRecognizer.ERROR_CLIENT -> "Koneksi speech terputus."
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Waktu bicara habis."
+                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Mikrofon sibuk, coba lagi."
+                    10 -> "Terlalu banyak permintaan."
+                    11 -> "Koneksi server terputus. Silakan coba lagi."
+                    12 -> "Bahasa tidak didukung."
+                    13 -> "Bahasa belum tersedia."
+                    else -> "Error speech ($error)"
+                }
+                android.util.Log.e("SpeechRecognizer", "onError: code=$error, msg=$errorMessage")
+
+                destroyRecognizerInternal()
+                _state.value = SpeechState.Error(errorMessage, errorCode = error)
+            }
+
+            // Final complete speech results when user finishes speaking
+            override fun onResults(results: Bundle?) {
+                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                val resultText = matches?.getOrNull(0)
+                android.util.Log.d("SpeechRecognizer", "onResults: matches=$resultText")
+                destroyRecognizerInternal()
+                if (!resultText.isNullOrBlank()) {
+                    _state.value = SpeechState.Result(resultText)
+                } else {
+                    _state.value = SpeechState.Error("Tidak ada suara terdeteksi.")
+                }
+            }
+
+            // Real-time interim preview
+            override fun onPartialResults(partialResults: Bundle?) {
+                val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                val text = matches?.getOrNull(0) ?: ""
+                android.util.Log.d("SpeechRecognizer", "onPartialResults: $text")
+                if (text.isNotBlank()) {
+                    _state.value = SpeechState.Listening(partialText = text)
+                }
+            }
+
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+
         speechRecognizer = recognizer
         return recognizer
     }
@@ -129,13 +139,13 @@ class SpeechRecognizerManager @Inject constructor(
                     return@post
                 }
 
-                // Cancel previous session before starting a new one
+                // Safely cancel any active audio session
                 try {
                     speechRecognizer?.cancel()
                 } catch (_: Exception) {}
 
-                _state.value = SpeechState.Idle
-                android.util.Log.d("SpeechRecognizer", "startListening: lang=$language")
+                _state.value = SpeechState.Listening()
+                android.util.Log.d("SpeechRecognizer", "startListening: lang=$language (onDevice=$isOnDeviceSupported)")
 
                 val recognizer = getOrCreateRecognizer()
 
@@ -147,19 +157,21 @@ class SpeechRecognizerManager @Inject constructor(
                     )
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, language)
+                    putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, true)
+                    putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(language, "id-ID", "id", "in-ID", "in"))
                     putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                     putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
                     putExtra(
                         RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
-                        3500L
-                    )
-                    putExtra(
-                        RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
                         2500L
                     )
                     putExtra(
+                        RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+                        2000L
+                    )
+                    putExtra(
                         RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
-                        1500L
+                        500L
                     )
                     putExtra(
                         RecognizerIntent.EXTRA_PROMPT,
@@ -178,18 +190,16 @@ class SpeechRecognizerManager @Inject constructor(
 
     fun stopListening() {
         mainHandler.post {
-            try {
-                speechRecognizer?.stopListening()
-                speechRecognizer?.cancel()
-            } catch (_: Exception) {
-                // Ignore cancel errors
-            }
+            destroyRecognizerInternal()
             _state.value = SpeechState.Idle
         }
     }
 
     fun resetState() {
-        _state.value = SpeechState.Idle
+        mainHandler.post {
+            destroyRecognizerInternal()
+            _state.value = SpeechState.Idle
+        }
     }
 
     fun destroy() {

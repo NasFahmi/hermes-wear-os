@@ -28,7 +28,7 @@ class VoiceViewModel @Inject constructor(
         speechRecognizerManager.state
 
     val voiceLanguage: StateFlow<String> = authManager.voiceLanguage
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "id-ID")
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "id-ID")
 
     fun checkWakeWord(input: String): Pair<Boolean, String> {
         val trimmed = input.trim()
@@ -38,7 +38,7 @@ class VoiceViewModel @Inject constructor(
     }
 
     fun startListening() {
-        val currentLang = voiceLanguage.value
+        val currentLang = voiceLanguage.value.ifBlank { "id-ID" }
         speechRecognizerManager.startListening(currentLang)
     }
 
