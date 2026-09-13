@@ -50,6 +50,7 @@ fun AssistantScreen(
 
     var directLiveText by remember { mutableStateOf("") }
     var hasAutoLaunchedVoice by rememberSaveable { mutableStateOf(false) }
+    var hasTriggeredReadyHaptic by remember { mutableStateOf(false) }
 
     // Fallback: Native Wear OS System Speech Recognition Dialog Launcher
     val systemSpeechLauncher = rememberLauncherForActivityResult(
@@ -93,7 +94,7 @@ fun AssistantScreen(
 
     // In-App Seamless Voice Recognition (Hands-Free Gemini Style)
     val startDirectVoice: () -> Unit = {
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        hasTriggeredReadyHaptic = false
         directLiveText = ""
         chatViewModel.startDirectListening()
         voiceViewModel.startListening()
@@ -118,7 +119,14 @@ fun AssistantScreen(
     // ── 2. Speech State Handling (Real-time live partial text & automatic result) ──
     LaunchedEffect(speechState) {
         when (val state = speechState) {
+            is SpeechRecognizerManager.SpeechState.Initializing -> {
+                hasTriggeredReadyHaptic = false
+            }
             is SpeechRecognizerManager.SpeechState.Listening -> {
+                if (!hasTriggeredReadyHaptic) {
+                    hasTriggeredReadyHaptic = true
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                }
                 if (state.partialText.isNotBlank()) {
                     directLiveText = state.partialText
                 }
@@ -142,7 +150,9 @@ fun AssistantScreen(
                     chatViewModel.askDirectQuestion(fallbackQuery)
                 }
             }
-            is SpeechRecognizerManager.SpeechState.Idle -> {}
+            is SpeechRecognizerManager.SpeechState.Idle -> {
+                hasTriggeredReadyHaptic = false
+            }
         }
     }
 
@@ -217,6 +227,7 @@ fun AssistantScreen(
                     is AssistantUiState.DirectListening -> {
                         DirectListeningSection(
                             liveText = directLiveText,
+                            isInitializing = speechState is SpeechRecognizerManager.SpeechState.Initializing,
                             onRetry = {
                                 startDirectVoice()
                             },
@@ -383,6 +394,7 @@ private fun AssistantIdleSection(
 @Composable
 private fun DirectListeningSection(
     liveText: String,
+    isInitializing: Boolean = false,
     onRetry: () -> Unit,
     onCancel: () -> Unit,
     onSendNow: () -> Unit,
@@ -393,13 +405,22 @@ private fun DirectListeningSection(
     val infiniteTransition = rememberInfiniteTransition(label = "direct_pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.18f,
+        targetValue = if (isInitializing) 1.10f else 1.18f,
         animationSpec = infiniteRepeatable(
-            animation = tween(750, easing = FastOutSlowInEasing),
+            animation = tween(if (isInitializing) 1000 else 750, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse_scale"
     )
+
+    val dotColor = if (isInitializing) HermesColors.Warning else HermesColors.Primary
+    val statusText = if (isInitializing) "Menyiapkan mikrofon..." else "Mendengarkan..."
+    val statusColor = if (isInitializing) HermesColors.Warning else HermesColors.PrimaryLight
+    val promptText = when {
+        liveText.isNotBlank() -> liveText
+        isInitializing -> "Tunggu sebentar..."
+        else -> "Bicara sekarang..."
+    }
 
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -417,15 +438,15 @@ private fun DirectListeningSection(
                         .size(8.dp)
                         .scale(pulseScale)
                         .clip(CircleShape)
-                        .background(HermesColors.Primary)
+                        .background(dotColor)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "Mendengarkan...",
+                    text = statusText,
                     style = HermesTypography.caption.copy(
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = HermesColors.PrimaryLight
+                        color = statusColor
                     )
                 )
             }
@@ -437,7 +458,7 @@ private fun DirectListeningSection(
 
         item {
             Text(
-                text = if (liveText.isNotBlank()) liveText else "Bicara sekarang...",
+                text = promptText,
                 style = HermesTypography.title.copy(
                     fontSize = if (liveText.isNotBlank()) 16.sp else 14.sp,
                     lineHeight = 22.sp,

@@ -21,6 +21,7 @@ class SpeechRecognizerManager @Inject constructor(
 ) {
     sealed class SpeechState {
         data object Idle : SpeechState()
+        data object Initializing : SpeechState()
         data class Listening(val partialText: String = "") : SpeechState()
         data class Result(val text: String) : SpeechState()
         data class Error(val message: String, val errorCode: Int = 0) : SpeechState()
@@ -35,6 +36,18 @@ class SpeechRecognizerManager @Inject constructor(
     val isOnDeviceSupported: Boolean
         get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                 SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+
+    fun warmUp() {
+        mainHandler.post {
+            try {
+                if (SpeechRecognizer.isRecognitionAvailable(context)) {
+                    getOrCreateRecognizer()
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("SpeechRecognizer", "warmUp failed: ${e.message}")
+            }
+        }
+    }
 
     private fun getOrCreateRecognizer(): SpeechRecognizer {
         speechRecognizer?.let { return it }
@@ -54,13 +67,15 @@ class SpeechRecognizerManager @Inject constructor(
 
         recognizer.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
-                android.util.Log.d("SpeechRecognizer", "onReadyForSpeech")
+                android.util.Log.d("SpeechRecognizer", "onReadyForSpeech - Mic is officially open")
                 _state.value = SpeechState.Listening()
             }
 
             override fun onBeginningOfSpeech() {
-                android.util.Log.d("SpeechRecognizer", "onBeginningOfSpeech")
-                _state.value = SpeechState.Listening()
+                android.util.Log.d("SpeechRecognizer", "onBeginningOfSpeech - User speech detected")
+                if (_state.value !is SpeechState.Listening) {
+                    _state.value = SpeechState.Listening()
+                }
             }
 
             override fun onRmsChanged(rmsdB: Float) {}
@@ -144,8 +159,8 @@ class SpeechRecognizerManager @Inject constructor(
                     speechRecognizer?.cancel()
                 } catch (_: Exception) {}
 
-                _state.value = SpeechState.Listening()
-                android.util.Log.d("SpeechRecognizer", "startListening: lang=$language (onDevice=$isOnDeviceSupported)")
+                _state.value = SpeechState.Initializing
+                android.util.Log.d("SpeechRecognizer", "startListening: initializing lang=$language (onDevice=$isOnDeviceSupported)")
 
                 val recognizer = getOrCreateRecognizer()
 

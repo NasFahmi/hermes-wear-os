@@ -24,6 +24,10 @@ class VoiceViewModel @Inject constructor(
         )
     }
 
+    init {
+        speechRecognizerManager.warmUp()
+    }
+
     val speechState: StateFlow<SpeechRecognizerManager.SpeechState> =
         speechRecognizerManager.state
 
