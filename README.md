@@ -4,6 +4,7 @@
 [![Language](https://img.shields.io/badge/Kotlin-2.0.21-purple.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![UI Toolkit](https://img.shields.io/badge/UI-Jetpack%20Compose%20for%20Wear-green.svg?logo=jetpackcompose&logoColor=white)](https://developer.android.com/training/wearables/compose)
 [![DI](https://img.shields.io/badge/DI-Hilt-orange.svg)](https://dagger.dev/hilt/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **Hermes Wear OS Gateway** adalah aplikasi *standalone smartwatch client* dalam ekosistem **Hermes AI Assistant**. Aplikasi ini dirancang khusus untuk interaksi cepat, ringkas, dan *hands-free* langsung dari pergelangan tangan Anda (misal: Samsung Galaxy Watch, Google Pixel Watch, TicWatch).
 
@@ -140,4 +141,5 @@ Untuk menjalankan unit test:
 ## 📄 Lisensi & Kontributor
 
 - **Pemilik Proyek**: Nasrul Fahmi
-- Proyek ini dikembangkan sebagai bagian dari ekosistem **Hermes AI Assistant**.
+- Proyek ini dirilis di bawah lisensi **[MIT License](LICENSE)** — bebas digunakan, dimodifikasi, dan didistribusikan untuk keperluan personal maupun komersial.
+- Dikembangkan sebagai bagian dari ekosistem **Hermes AI Assistant**.
